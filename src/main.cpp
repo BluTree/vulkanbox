@@ -22,6 +22,8 @@
 #include <stdlib.h>         // abort
 #include <tchar.h>
 
+#include <string.hh>
+
 // Volk headers
 #ifdef IMGUI_IMPL_VULKAN_USE_VOLK
 #define VOLK_IMPLEMENTATION
@@ -456,8 +458,11 @@ int main(int, char**)
         {
             static float f = 0.0f;
             static int counter = 0;
+			static mc::string str("Hello World str");
 
             ImGui::Begin("Hello, world!");                          // Create a window called "Hello, world!" and append into it.
+
+			ImGui::InputText("mc::string", str.data(), str.size());
 
             ImGui::Text("This is some useful text.");               // Display some text (you can use a format strings too)
             ImGui::Checkbox("Demo Window", &show_demo_window);      // Edit bools storing our window open/close state

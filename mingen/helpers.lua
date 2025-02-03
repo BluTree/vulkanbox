@@ -1,3 +1,4 @@
+-- merge multiples arrays into a single one. Also works with mix of single values and arrays.
 function merge(...)
 	res = {}
 	i = 1

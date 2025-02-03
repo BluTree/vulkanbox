@@ -6,6 +6,7 @@ end
 
 vulkan = require('deps/vulkan')
 imgui = require('deps/imgui')
+mincore = require('deps/mincore')
 
 local vkb = mg.project({
 	name = 'vulkanbox',
@@ -14,11 +15,12 @@ local vkb = mg.project({
 	includes = merge(
 		{mg.get_build_dir() .. 'deps/'},
 		imgui.includes,
-		vulkan.includes
+		vulkan.includes,
+		mincore.includes
 	),
-	compile_options = {'-g', '-Wall', '-Wextra', '-Werror'},
+	compile_options = {'-g', '-std=c++20', '-Wall', '-Wextra', '-Werror'},
 	link_options = {'-g'},
-	dependencies = {imgui.project, vulkan.project}
+	dependencies = {imgui.project, vulkan.project, mincore.project}
 })
 
 -- Manage list of source patterns that are platform specific
