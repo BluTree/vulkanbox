@@ -1,0 +1,25 @@
+{
+	// See https://go.microsoft.com/fwlink/?LinkId=733558
+	// for the documentation about the tasks.json format
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "generate vulkanbox",
+			"type": "shell",
+			"command": "mingen -c ${input:generate_config} --compile-db",
+			"problemMatcher": []
+		}
+	],
+	"inputs": [
+		{
+			"id": "generate_config",
+			"description": "Generation Configuration",
+			"type": "pickString",
+			"options": [
+				"debug",
+				"release"
+			],
+			"default": "debug"
+		}
+	]
+}

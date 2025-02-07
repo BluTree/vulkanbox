@@ -8,16 +8,30 @@ vulkan = require('deps/vulkan')
 imgui = require('deps/imgui')
 mincore = require('deps/mincore')
 
-local vkb = mg.project({
-	name = 'vulkanbox',
-	type = mg.project_type.executable,
-	sources = {'src/main.cpp'},
-	includes = merge(
+include_dirs = {}
+if (mg.platform() == 'windows') then
+	modular_win32 = require('deps/modular_win32')
+	include_dirs = merge(
+		{mg.get_build_dir() .. 'deps/'},
+		imgui.includes,
+		vulkan.includes,
+		mincore.includes,
+		modular_win32.includes
+	)
+else
+	include_dirs = merge(
 		{mg.get_build_dir() .. 'deps/'},
 		imgui.includes,
 		vulkan.includes,
 		mincore.includes
-	),
+	)
+end
+
+local vkb = mg.project({
+	name = 'vulkanbox',
+	type = mg.project_type.executable,
+	sources = {'src/main.cpp'},
+	includes = include_dirs,
 	compile_options = {'-g', '-std=c++20', '-Wall', '-Wextra', '-Werror'},
 	link_options = {'-g'},
 	dependencies = {imgui.project, vulkan.project, mincore.project}
