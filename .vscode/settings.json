@@ -1,0 +1,6 @@
+{
+	"editor.formatOnSave": true,
+	"C_Cpp.codeAnalysis.exclude": {
+		"build/deps/**": true
+	}
+}

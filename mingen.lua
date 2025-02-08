@@ -12,7 +12,7 @@ include_dirs = {}
 if (mg.platform() == 'windows') then
 	modular_win32 = require('deps/modular_win32')
 	include_dirs = merge(
-		{mg.get_build_dir() .. 'deps/'},
+		{mg.get_build_dir() .. 'deps/', 'src/'},
 		imgui.includes,
 		vulkan.includes,
 		mincore.includes,
@@ -20,19 +20,35 @@ if (mg.platform() == 'windows') then
 	)
 else
 	include_dirs = merge(
-		{mg.get_build_dir() .. 'deps/'},
+		{mg.get_build_dir() .. 'deps/', 'src/'},
 		imgui.includes,
 		vulkan.includes,
 		mincore.includes
 	)
 end
 
+platform_define = ''
+if (mg.platform() == 'windows') then
+	platform_define = '-D"VKB_WINDOWS"'
+elseif (mg.platform() == 'linux') then
+	platform_define = '-D"VKB_LINUX"'
+else
+	error("Unsupported platform")
+end
+
+platform_compile_options = {}
+if (mg.platform() == 'windows') then
+	platform_compile_options = {
+		'-Wno-ignored-pragma-intrinsic' -- Warning raised on win32/misc.h pragma intrinsic
+	}
+end
+
 local vkb = mg.project({
 	name = 'vulkanbox',
 	type = mg.project_type.executable,
-	sources = {'src/main.cpp'},
+	sources = {'src/**.cc'},
 	includes = include_dirs,
-	compile_options = {'-g', '-std=c++20', '-Wall', '-Wextra', '-Werror'},
+	compile_options = merge('-g', '-std=c++20', '-Wall', '-Wextra', '-Werror', platform_define, platform_compile_options),
 	link_options = {'-g'},
 	dependencies = {imgui.project, vulkan.project, mincore.project}
 })

@@ -8,6 +8,24 @@
 			"type": "shell",
 			"command": "mingen -c ${input:generate_config} --compile-db",
 			"problemMatcher": []
+		},
+		{
+			"label": "build",
+			"type": "shell",
+			"command": "ninja -C build",
+			"presentation": {
+				"echo": true,
+				"reveal": "silent",
+				"focus": false,
+				"panel": "shared",
+				"showReuseMessage": false,
+				"clear": true
+			},
+			"group": "build",
+			"problemMatcher": [
+				"$gcc",
+				"$msCompile"
+			]
 		}
 	],
 	"inputs": [
