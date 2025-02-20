@@ -3,6 +3,10 @@
 
 #include "log.hh"
 
+#include <imgui/backends/imgui_impl_vulkan.h>
+#include <imgui/backends/imgui_impl_win32.h>
+#include <imgui/imgui.h>
+
 int main([[maybe_unused]] int argc, [[maybe_unused]] char** argv)
 {
 	vkb::window      main_window;
@@ -15,10 +19,12 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char** argv)
 	{
 		main_window.update();
 
-		ctx.draw();
+		if (!main_window.closed() && !main_window.minimized())
+			ctx.draw();
 
 		if (main_window.closed())
 			running = false;
 	}
+
 	return 0;
 }

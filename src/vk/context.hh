@@ -26,6 +26,9 @@ namespace vkb::vk
 		void draw();
 
 	private:
+		constexpr static uint8_t max_frames_in_flight {2};
+		uint8_t                  cur_frame_ {0};
+
 		static VKAPI_ATTR VkBool32 VKAPI_CALL debug_callback(
 			VkDebugUtilsMessageSeverityFlagBitsEXT      message_level,
 			VkDebugUtilsMessageTypeFlagsEXT             message_type,
@@ -79,6 +82,8 @@ namespace vkb::vk
 
 		bool record_command_buffer(VkCommandBuffer cmd, uint32_t img_idx);
 
+		void recreate_swapchain();
+
 		window const& win_;
 		bool          created_ {true};
 
@@ -109,10 +114,10 @@ namespace vkb::vk
 		mc::vector<VkFramebuffer> framebuffers_;
 
 		VkCommandPool   command_pool_ {nullptr};
-		VkCommandBuffer command_buffer_ {nullptr};
+		VkCommandBuffer command_buffers_[context::max_frames_in_flight] {nullptr};
 
-		VkSemaphore img_avail_semaphore_ {nullptr};
-		VkSemaphore draw_end_semaphore_ {nullptr};
-		VkFence     in_flight_fence_ {nullptr};
+		VkSemaphore img_avail_semaphores_[context::max_frames_in_flight] {nullptr};
+		VkSemaphore draw_end_semaphores_[context::max_frames_in_flight] {nullptr};
+		VkFence     in_flight_fences_[context::max_frames_in_flight] {nullptr};
 	};
 }

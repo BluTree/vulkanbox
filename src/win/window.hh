@@ -24,6 +24,7 @@ namespace vkb
 		void update();
 
 		bool  closed() const;
+		bool  minimized() const;
 		void* native_handle() const;
 
 		mc::pair<uint32_t, uint32_t> size() const;
@@ -39,5 +40,6 @@ namespace vkb
 		void* handle_;
 
 		bool closed_ {false};
+		bool min_ {false};
 	};
 }

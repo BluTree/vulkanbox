@@ -88,6 +88,11 @@ namespace vkb
 		return closed_;
 	}
 
+	bool window::minimized() const
+	{
+		return min_;
+	}
+
 	void* window::native_handle() const
 	{
 		return handle_;
@@ -123,6 +128,13 @@ namespace vkb
 			case WM_DESTROY:
 				win->closed_ = true;
 				win->handle_ = nullptr;
+				break;
+
+			case WM_SIZE:
+				if (w_param == 1 /*SIZE_MINIMIZED*/)
+					win->min_ = true;
+				else
+					win->min_ = false;
 				break;
 
 			default: break;

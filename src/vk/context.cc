@@ -2,6 +2,7 @@
 #include "../log.hh"
 #include "../win/window.hh"
 
+#include <imgui/backends/imgui_impl_vulkan.h>
 #include <win32/misc.h>
 
 #include <vulkan/vulkan_win32.h>
@@ -138,12 +139,15 @@ namespace vkb::vk
 	{
 		vkDeviceWaitIdle(device_);
 
-		if (in_flight_fence_)
-			vkDestroyFence(device_, in_flight_fence_, nullptr);
-		if (draw_end_semaphore_)
-			vkDestroySemaphore(device_, draw_end_semaphore_, nullptr);
-		if (img_avail_semaphore_)
-			vkDestroySemaphore(device_, img_avail_semaphore_, nullptr);
+		for (uint8_t i {0}; i < context::max_frames_in_flight; ++i)
+		{
+			if (in_flight_fences_[i])
+				vkDestroyFence(device_, in_flight_fences_[i], nullptr);
+			if (draw_end_semaphores_[i])
+				vkDestroySemaphore(device_, draw_end_semaphores_[i], nullptr);
+			if (img_avail_semaphores_[i])
+				vkDestroySemaphore(device_, img_avail_semaphores_[i], nullptr);
+		}
 
 		if (command_pool_)
 			vkDestroyCommandPool(device_, command_pool_, nullptr);
@@ -187,33 +191,41 @@ namespace vkb::vk
 
 	void context::draw()
 	{
-		vkWaitForFences(device_, 1, &in_flight_fence_, VK_TRUE, UINT64_MAX);
-		vkResetFences(device_, 1, &in_flight_fence_);
+		vkWaitForFences(device_, 1, &in_flight_fences_[cur_frame_], VK_TRUE, UINT64_MAX);
 
 		uint32_t img_idx;
-		vkAcquireNextImageKHR(device_, swapchain_, UINT64_MAX, img_avail_semaphore_,
-		                      VK_NULL_HANDLE, &img_idx);
+		VkResult res = vkAcquireNextImageKHR(device_, swapchain_, UINT64_MAX,
+		                                     img_avail_semaphores_[cur_frame_],
+		                                     VK_NULL_HANDLE, &img_idx);
 
-		vkResetCommandBuffer(command_buffer_, 0);
-		record_command_buffer(command_buffer_, img_idx);
+		if (res == VK_ERROR_OUT_OF_DATE_KHR)
+		{
+			recreate_swapchain();
+			return;
+		}
+
+		vkResetFences(device_, 1, &in_flight_fences_[cur_frame_]);
+
+		vkResetCommandBuffer(command_buffers_[cur_frame_], 0);
+		record_command_buffer(command_buffers_[cur_frame_], img_idx);
 
 		VkSubmitInfo submit_info {};
 		submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 
-		VkSemaphore          sem_wait[] {img_avail_semaphore_};
+		VkSemaphore          sem_wait[] {img_avail_semaphores_[cur_frame_]};
 		VkPipelineStageFlags stages_wait[] {
 			VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
 		submit_info.waitSemaphoreCount = 1;
 		submit_info.pWaitSemaphores = sem_wait;
 		submit_info.pWaitDstStageMask = stages_wait;
 		submit_info.commandBufferCount = 1;
-		submit_info.pCommandBuffers = &command_buffer_;
+		submit_info.pCommandBuffers = &command_buffers_[cur_frame_];
 
-		VkSemaphore sem_signal[] {draw_end_semaphore_};
+		VkSemaphore sem_signal[] {draw_end_semaphores_[cur_frame_]};
 		submit_info.signalSemaphoreCount = 1;
 		submit_info.pSignalSemaphores = sem_signal;
 
-		vkQueueSubmit(graphics_queue_, 1, &submit_info, in_flight_fence_);
+		vkQueueSubmit(graphics_queue_, 1, &submit_info, in_flight_fences_[cur_frame_]);
 
 		VkPresentInfoKHR present_info {};
 		present_info.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
@@ -225,7 +237,11 @@ namespace vkb::vk
 		present_info.pSwapchains = swapchains;
 		present_info.pImageIndices = &img_idx;
 
-		vkQueuePresentKHR(present_queue_, &present_info);
+		res = vkQueuePresentKHR(present_queue_, &present_info);
+		if (res == VK_ERROR_OUT_OF_DATE_KHR || res == VK_SUBOPTIMAL_KHR)
+			recreate_swapchain();
+
+		cur_frame_ = (cur_frame_ + 1) % context::max_frames_in_flight;
 	}
 
 	VKAPI_ATTR VkBool32 VKAPI_CALL
@@ -955,9 +971,9 @@ namespace vkb::vk
 		alloc_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
 		alloc_info.commandPool = command_pool_;
 		alloc_info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-		alloc_info.commandBufferCount = 1;
+		alloc_info.commandBufferCount = context::max_frames_in_flight;
 
-		VkResult res = vkAllocateCommandBuffers(device_, &alloc_info, &command_buffer_);
+		VkResult res = vkAllocateCommandBuffers(device_, &alloc_info, command_buffers_);
 		return res == VK_SUCCESS;
 	}
 
@@ -970,12 +986,19 @@ namespace vkb::vk
 		fence_info.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
 		fence_info.flags = VK_FENCE_CREATE_SIGNALED_BIT;
 
-		VkResult res1 =
-			vkCreateSemaphore(device_, &sem_info, nullptr, &img_avail_semaphore_);
-		VkResult res2 =
-			vkCreateSemaphore(device_, &sem_info, nullptr, &draw_end_semaphore_);
-		VkResult res3 = vkCreateFence(device_, &fence_info, nullptr, &in_flight_fence_);
-		return res1 == VK_SUCCESS && res2 == VK_SUCCESS && res3 == VK_SUCCESS;
+		for (uint8_t i {0}; i < context::max_frames_in_flight; ++i)
+		{
+			VkResult res1 =
+				vkCreateSemaphore(device_, &sem_info, nullptr, &img_avail_semaphores_[i]);
+			VkResult res2 =
+				vkCreateSemaphore(device_, &sem_info, nullptr, &draw_end_semaphores_[i]);
+			VkResult res3 =
+				vkCreateFence(device_, &fence_info, nullptr, &in_flight_fences_[i]);
+
+			if (res1 != VK_SUCCESS && res2 != VK_SUCCESS && res3 != VK_SUCCESS)
+				return false;
+		}
+		return true;
 	}
 
 	bool context::record_command_buffer(VkCommandBuffer cmd, uint32_t img_idx)
@@ -1022,5 +1045,25 @@ namespace vkb::vk
 
 		res = vkEndCommandBuffer(cmd);
 		return res != VK_SUCCESS;
+	}
+
+	void context::recreate_swapchain()
+	{
+		vkDeviceWaitIdle(device_);
+
+		for (uint32_t i {0}; i < framebuffers_.size(); ++i)
+			vkDestroyFramebuffer(device_, framebuffers_[i], nullptr);
+		for (uint32_t i {0}; i < swapchain_image_views_.size(); ++i)
+			vkDestroyImageView(device_, swapchain_image_views_[i], nullptr);
+
+		if (swapchain_)
+			vkDestroySwapchainKHR(device_, swapchain_, nullptr);
+
+		swapchain_support_ = query_swapchain_support(phys_device_);
+		bool res = create_swapchain();
+		res &= create_image_views();
+		res &= create_framebuffers();
+		if (!res)
+			log::error("Cannot recreate swapchain");
 	}
 } // namespace vkb::vk
