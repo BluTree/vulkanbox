@@ -11,6 +11,7 @@ By ease of use, the current project uses default win32 and vulkan backends. Win3
    But the includes path returned by the script have issues, because the relative path is resolved when using it, not creating it.
    In this case, without the 'deps/' before imgui_dest_dir, the path returned would be '../build/deps/imgui/',
    but would be resolved on the main script, making it looking for a 'build/' directory outside the repo!
+   - Solution : Convert path to absolute
 --]]
 
 local imgui_dest_dir = mg.get_build_dir() .. 'deps/imgui/'
@@ -21,6 +22,8 @@ if net.download(imgui_url, imgui_dest_dir) then
 else
 	io.write('imgui: up-to-date\n')
 end
+
+require('deps/vulkan')
 
 local imgui = mg.project({
 	name = "imgui",

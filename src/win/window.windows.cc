@@ -28,8 +28,8 @@ namespace vkb
 		}
 
 		handle_ = CreateWindowExW(0, L"vulkanbox_window", L"main_window",
-		                          WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT, 1280,
-		                          720, nullptr, nullptr, instance, nullptr);
+		                          WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT, 1000,
+		                          800, nullptr, nullptr, instance, nullptr);
 		if (!handle_)
 		{
 			log::error("Cannot create window");
@@ -91,6 +91,21 @@ namespace vkb
 	void* window::native_handle() const
 	{
 		return handle_;
+	}
+
+	mc::pair<uint32_t, uint32_t> window::size() const
+	{
+		RECT rect;
+		GetClientRect(handle_, &rect);
+		return {static_cast<uint32_t>(rect.right - rect.left),
+		        static_cast<uint32_t>(rect.bottom - rect.top)};
+	}
+
+	mc::pair<int32_t, int32_t> window::position() const
+	{
+		RECT rect;
+		GetClientRect(handle_, &rect);
+		return {rect.left, rect.top};
 	}
 
 	LRESULT window::wnd_proc(HWND hwnd, UINT msg, WPARAM w_param, LPARAM l_param)

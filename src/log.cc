@@ -1,9 +1,11 @@
 #include "log.hh"
 
-#include <stdarg.h>
+#include <string_view.hh>
+
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #define RED "\x1b[31m"
 #define YELLOW "\x1b[33m"
@@ -63,12 +65,42 @@ namespace vkb::log
 
 	void assert(bool cond, char const* format, ...)
 	{
-		if (cond)
+		if (!cond)
 		{
 			va_list args;
 			va_start(args, format);
 			print(RED "[assert]" DEFAULT, format, args);
 			va_end(args);
+
+			abort();
+		}
+	}
+
+	void debug_v(char const* format, va_list args)
+	{
+		print("[debug]", format, args);
+	}
+
+	void info_v(char const* format, va_list args)
+	{
+		print(MAGENTA "[info] " DEFAULT, format, args);
+	}
+
+	void warn_v(char const* format, va_list args)
+	{
+		print(YELLOW "[warn] " DEFAULT, format, args);
+	}
+
+	void error_v(char const* format, va_list args)
+	{
+		print(RED "[error]" DEFAULT, format, args);
+	}
+
+	void assert_v(bool cond, char const* format, va_list args)
+	{
+		if (!cond)
+		{
+			print(RED "[assert]" DEFAULT, format, args);
 
 			abort();
 		}

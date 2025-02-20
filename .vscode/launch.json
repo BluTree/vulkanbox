@@ -11,7 +11,7 @@
 			"program": "${workspaceFolder}/build/bin/vulkanbox.exe",
 			"args": [],
 			"stopAtEntry": false,
-			"cwd": "${fileDirname}",
+			"cwd": "${workspaceFolder}/build/bin/",
 			"environment": [],
 			"console": "integratedTerminal",
 			"preLaunchTask": "build"

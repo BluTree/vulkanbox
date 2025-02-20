@@ -29,7 +29,7 @@ end
 
 platform_define = ''
 if (mg.platform() == 'windows') then
-	platform_define = '-D"VKB_WINDOWS"'
+	platform_define = '-D"VKB_WINDOWS" -D"_CRT_SECURE_NO_WARNINGS"'
 elseif (mg.platform() == 'linux') then
 	platform_define = '-D"VKB_LINUX"'
 else
@@ -43,13 +43,20 @@ if (mg.platform() == 'windows') then
 	}
 end
 
+platform_link_options = {}
+if (mg.platform() == 'windows') then
+	platform_link_options = {
+		'-Xlinker /incremental:no'
+	}
+end
+
 local vkb = mg.project({
 	name = 'vulkanbox',
 	type = mg.project_type.executable,
 	sources = {'src/**.cc'},
 	includes = include_dirs,
 	compile_options = merge('-g', '-std=c++20', '-Wall', '-Wextra', '-Werror', platform_define, platform_compile_options),
-	link_options = {'-g'},
+	link_options = merge('-g', platform_link_options),
 	dependencies = {imgui.project, vulkan.project, mincore.project}
 })
 
@@ -76,6 +83,24 @@ while i <= j do
 		end
 	end
 	i = i + 1
+end
+
+-- Shaders
+shaders = mg.collect_files('res/shaders/*.glsl')
+for i=1,#shaders do
+	shader_stage = ''
+	if (string.find(shaders[i], '.vert') ~= nil) then
+		shader_stage = 'vertex'
+	elseif (string.find(shaders[i], '.frag') ~= nil) then
+		shader_stage = 'fragment'
+	end
+
+	spirv = mg.get_build_dir() .. 'bin/' .. string.gsub(shaders[i], '.glsl', '.spirv')
+	mg.add_post_build_cmd(vkb, {
+		input = shaders[i],
+		output = spirv,
+		cmd = 'glslc -fshader-stage=' .. shader_stage .. ' ${in} -o ${out}'
+	})
 end
 
 if mg.need_generate() then

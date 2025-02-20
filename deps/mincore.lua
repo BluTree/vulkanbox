@@ -7,6 +7,6 @@ else
 	io.write('mincore: up-to-date\n')
 end
 
-local mincore = require('build/deps/mincore/mingen')
+local mincore = require('build/deps/mincore/mingen', 'release')
 
 return {project = mincore.project, includes = 'deps/' .. mincore_dest_dir .. 'src/'}

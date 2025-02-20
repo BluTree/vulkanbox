@@ -6,6 +6,8 @@
 #include <win32/window.h>
 #endif
 
+#include <pair.hh>
+
 namespace vkb
 {
 	class window
@@ -23,6 +25,9 @@ namespace vkb
 
 		bool  closed() const;
 		void* native_handle() const;
+
+		mc::pair<uint32_t, uint32_t> size() const;
+		mc::pair<int32_t, int32_t>   position() const;
 
 	private:
 #ifdef VKB_WINDOWS
