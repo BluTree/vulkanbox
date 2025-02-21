@@ -2,9 +2,14 @@
 
 #include "log.hh"
 
+#include <imgui/backends/imgui_impl_win32.h>
 #include <win32/misc.h>
 
 #include <string.h>
+
+extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(struct HWND__* hWnd,
+                                                             UINT msg, WPARAM wParam,
+                                                             LPARAM lParam);
 
 namespace vkb
 {
@@ -39,7 +44,7 @@ namespace vkb
 		{
 			SetWindowLongPtrW(handle_, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(this));
 
-			ShowWindow(handle_, SW_NORMAL);
+			// ShowWindow(handle_, SW_NORMAL);
 		}
 	}
 
@@ -120,6 +125,9 @@ namespace vkb
 		// ours.
 		if (!win)
 			return DefWindowProcW(hwnd, msg, w_param, l_param);
+
+		if (ImGui_ImplWin32_WndProcHandler((struct HWND__*)hwnd, msg, w_param, l_param))
+			return true;
 
 		switch (msg)
 		{

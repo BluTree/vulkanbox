@@ -13,6 +13,8 @@ namespace vkb
 	class window;
 }
 
+struct ImGui_ImplVulkan_InitInfo;
+
 namespace vkb::vk
 {
 	class context
@@ -24,6 +26,10 @@ namespace vkb::vk
 		bool created() const;
 
 		void draw();
+
+		void fill_init_info(ImGui_ImplVulkan_InitInfo& init_info);
+
+		void wait_completion();
 
 	private:
 		constexpr static uint8_t max_frames_in_flight {2};
@@ -80,6 +86,8 @@ namespace vkb::vk
 
 		bool create_sync_objects();
 
+		bool create_descriptor_pool();
+
 		bool record_command_buffer(VkCommandBuffer cmd, uint32_t img_idx);
 
 		void recreate_swapchain();
@@ -110,6 +118,7 @@ namespace vkb::vk
 
 		VkPipelineLayout pipe_layout_ {nullptr};
 		VkPipeline       graphics_pipe_ {nullptr};
+		VkPipelineCache  pipe_cache_ {VK_NULL_HANDLE};
 
 		mc::vector<VkFramebuffer> framebuffers_;
 
@@ -119,5 +128,7 @@ namespace vkb::vk
 		VkSemaphore img_avail_semaphores_[context::max_frames_in_flight] {nullptr};
 		VkSemaphore draw_end_semaphores_[context::max_frames_in_flight] {nullptr};
 		VkFence     in_flight_fences_[context::max_frames_in_flight] {nullptr};
+
+		VkDescriptorPool desc_pool_ {VK_NULL_HANDLE};
 	};
 }

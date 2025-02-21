@@ -133,11 +133,20 @@ namespace vkb::vk
 			log::error("Failed to create synchronization objects");
 			return;
 		}
+		created_ = create_descriptor_pool();
+		if (!created_)
+		{
+			log::error("Failed to create descriptor pool");
+			return;
+		}
 	}
 
 	context::~context()
 	{
 		vkDeviceWaitIdle(device_);
+
+		if (desc_pool_)
+			vkDestroyDescriptorPool(device_, desc_pool_, nullptr);
 
 		for (uint8_t i {0}; i < context::max_frames_in_flight; ++i)
 		{
@@ -242,6 +251,27 @@ namespace vkb::vk
 			recreate_swapchain();
 
 		cur_frame_ = (cur_frame_ + 1) % context::max_frames_in_flight;
+	}
+
+	void context::fill_init_info(ImGui_ImplVulkan_InitInfo& init_info)
+	{
+		init_info.Instance = inst_;
+		init_info.PhysicalDevice = phys_device_;
+		init_info.Device = device_;
+		init_info.Queue = graphics_queue_;
+		init_info.PipelineCache = pipe_cache_;
+		init_info.DescriptorPool = desc_pool_;
+		init_info.RenderPass = render_pass_;
+		init_info.Subpass = 0;
+		init_info.MinImageCount = context::max_frames_in_flight;
+		init_info.ImageCount = context::max_frames_in_flight;
+		init_info.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
+		init_info.Allocator = nullptr;
+	}
+
+	void context::wait_completion()
+	{
+		vkDeviceWaitIdle(device_);
 	}
 
 	VKAPI_ATTR VkBool32 VKAPI_CALL
@@ -1001,6 +1031,25 @@ namespace vkb::vk
 		return true;
 	}
 
+	bool context::create_descriptor_pool()
+	{
+		VkDescriptorPoolSize pool_sizes[] = {
+			{VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+		     IMGUI_IMPL_VULKAN_MINIMUM_IMAGE_SAMPLER_POOL_SIZE},
+		};
+		VkDescriptorPoolCreateInfo pool_info = {};
+		pool_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+		pool_info.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
+		pool_info.maxSets = 0;
+		for (VkDescriptorPoolSize& pool_size : pool_sizes)
+			pool_info.maxSets += pool_size.descriptorCount;
+		pool_info.poolSizeCount = 1;
+		pool_info.pPoolSizes = pool_sizes;
+		VkResult res = vkCreateDescriptorPool(device_, &pool_info, nullptr, &desc_pool_);
+
+		return res == VK_SUCCESS;
+	}
+
 	bool context::record_command_buffer(VkCommandBuffer cmd, uint32_t img_idx)
 	{
 		VkCommandBufferBeginInfo begin_info {};
@@ -1024,6 +1073,7 @@ namespace vkb::vk
 		render_pass_info.pClearValues = &clear_col;
 
 		vkCmdBeginRenderPass(cmd, &render_pass_info, VK_SUBPASS_CONTENTS_INLINE);
+
 		vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, graphics_pipe_);
 
 		VkViewport viewport {};
@@ -1041,6 +1091,10 @@ namespace vkb::vk
 		vkCmdSetScissor(cmd, 0, 1, &scissor);
 
 		vkCmdDraw(cmd, 3, 1, 0, 0);
+
+		ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(),
+		                                command_buffers_[cur_frame_]);
+
 		vkCmdEndRenderPass(cmd);
 
 		res = vkEndCommandBuffer(cmd);
@@ -1067,3 +1121,8 @@ namespace vkb::vk
 			log::error("Cannot recreate swapchain");
 	}
 } // namespace vkb::vk
+
+// __int64 __cdecl ImGui_ImplWin32_WndProcHandler(struct HWND__ *,unsigned int,unsigned
+// __int64,__int64)
+// __int64 __cdecl ImGui_ImplWin32_WndProcHandler(void *,unsigned int,unsigned
+// __int64,__int64)
