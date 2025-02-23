@@ -43,6 +43,14 @@ namespace vkb::vk
 	context::context(window const& win)
 	: win_ {win}
 	{
+		triangle_.verts = {
+			{{-0.5f, -0.5f, 0.0f, 1.0f}, {1.0f, 0.0f, 0.0f, 1.0f}},
+			{{0.5f, -0.5f, 0.0f, 1.0f},  {0.0f, 0.0f, 1.0f, 1.0f}},
+			{{0.5f, 0.5f, 0.0f, 1.0f},   {0.0f, 1.0f, 0.0f, 1.0f}},
+			{{-0.5f, 0.5f, 0.0f, 1.0f},  {1.0f, 1.0f, 1.0f, 1.0f}}
+        };
+		triangle_.idcs = {0, 1, 2, 0, 2, 3};
+
 		created_ = create_instance();
 		if (!created_)
 		{
@@ -120,6 +128,20 @@ namespace vkb::vk
 			return;
 		}
 
+		created_ = create_vertex_buffer();
+		if (!created_)
+		{
+			log::error("Failed to create vertex buffer");
+			return;
+		}
+
+		created_ = create_index_buffer();
+		if (!created_)
+		{
+			log::error("Failed to create index buffer");
+			return;
+		}
+
 		created_ = create_command_buffers();
 		if (!created_)
 		{
@@ -157,6 +179,18 @@ namespace vkb::vk
 			if (img_avail_semaphores_[i])
 				vkDestroySemaphore(device_, img_avail_semaphores_[i], nullptr);
 		}
+
+		if (index_buffer_memory_)
+			vkFreeMemory(device_, index_buffer_memory_, nullptr);
+
+		if (index_buffer_)
+			vkDestroyBuffer(device_, index_buffer_, nullptr);
+
+		if (vertex_buffer_memory_)
+			vkFreeMemory(device_, vertex_buffer_memory_, nullptr);
+
+		if (vertex_buffer_)
+			vkDestroyBuffer(device_, vertex_buffer_, nullptr);
 
 		if (command_pool_)
 			vkDestroyCommandPool(device_, command_pool_, nullptr);
@@ -833,8 +867,16 @@ namespace vkb::vk
 		VkPipelineShaderStageCreateInfo shader_stages[] {vert_create_info,
 		                                                 frag_create_info};
 
+		VkVertexInputBindingDescription binding_desc = object::binding_desc();
+		mc::array<VkVertexInputAttributeDescription, 2> attribute_descs =
+			object::attribute_descs();
+
 		VkPipelineVertexInputStateCreateInfo vert_input_info {};
 		vert_input_info.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+		vert_input_info.vertexBindingDescriptionCount = 1;
+		vert_input_info.pVertexBindingDescriptions = &binding_desc;
+		vert_input_info.vertexAttributeDescriptionCount = attribute_descs.size();
+		vert_input_info.pVertexAttributeDescriptions = attribute_descs.data();
 
 		VkPipelineInputAssemblyStateCreateInfo input_assembly {};
 		input_assembly.sType =
@@ -995,6 +1037,152 @@ namespace vkb::vk
 		return res == VK_SUCCESS;
 	}
 
+	bool context::create_vertex_buffer()
+	{
+		uint64_t buf_size {sizeof(object::vert) * triangle_.verts.size()};
+
+		VkBuffer       staging_buf {nullptr};
+		VkDeviceMemory staging_buf_memory {nullptr};
+
+		bool res = create_buffer(buf_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+		                         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+		                             VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+		                         staging_buf, staging_buf_memory);
+		if (!res)
+			return false;
+
+		void* buff_mem;
+		vkMapMemory(device_, staging_buf_memory, 0, buf_size, 0, &buff_mem);
+		memcpy(buff_mem, triangle_.verts.data(), buf_size);
+		vkUnmapMemory(device_, staging_buf_memory);
+
+		res = create_buffer(
+			buf_size,
+			VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, vertex_buffer_, vertex_buffer_memory_);
+
+		copy_buffer(staging_buf, vertex_buffer_, buf_size);
+
+		vkDestroyBuffer(device_, staging_buf, nullptr);
+		vkFreeMemory(device_, staging_buf_memory, nullptr);
+
+		return res;
+	}
+
+	bool context::create_index_buffer()
+	{
+		uint64_t buf_size {sizeof(uint16_t) * triangle_.idcs.size()};
+
+		VkBuffer       staging_buf {nullptr};
+		VkDeviceMemory staging_buf_memory {nullptr};
+
+		bool res = create_buffer(buf_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+		                         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+		                             VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+		                         staging_buf, staging_buf_memory);
+		if (!res)
+			return false;
+
+		void* buff_mem;
+		vkMapMemory(device_, staging_buf_memory, 0, buf_size, 0, &buff_mem);
+		memcpy(buff_mem, triangle_.idcs.data(), buf_size);
+		vkUnmapMemory(device_, staging_buf_memory);
+
+		res = create_buffer(
+			buf_size, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
+			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, index_buffer_, index_buffer_memory_);
+
+		copy_buffer(staging_buf, index_buffer_, buf_size);
+
+		vkDestroyBuffer(device_, staging_buf, nullptr);
+		vkFreeMemory(device_, staging_buf_memory, nullptr);
+
+		return res;
+	}
+
+	bool context::create_buffer(VkDeviceSize size, VkBufferUsageFlags usage,
+	                            VkMemoryPropertyFlags props, VkBuffer& buf,
+	                            VkDeviceMemory& buf_mem)
+	{
+		VkBufferCreateInfo create_info {};
+		create_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+		create_info.size = size;
+		create_info.usage = usage;
+		create_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+		VkResult res = vkCreateBuffer(device_, &create_info, nullptr, &buf);
+		if (res != VK_SUCCESS)
+			return false;
+
+		VkMemoryRequirements mem_req {};
+		vkGetBufferMemoryRequirements(device_, buf, &mem_req);
+		VkPhysicalDeviceMemoryProperties mem_props {};
+		vkGetPhysicalDeviceMemoryProperties(phys_device_, &mem_props);
+		uint32_t mem_type_idx {UINT32_MAX};
+		for (uint32_t i {0}; i < mem_props.memoryTypeCount; ++i)
+		{
+			if ((mem_req.memoryTypeBits & (1 << i)) &&
+			    ((mem_props.memoryTypes[i].propertyFlags & props) == props))
+			{
+				mem_type_idx = i;
+				break;
+			}
+		}
+		if (mem_type_idx == UINT32_MAX)
+			return false;
+
+		VkMemoryAllocateInfo alloc_info {};
+		alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+		alloc_info.allocationSize = mem_req.size;
+		alloc_info.memoryTypeIndex = mem_type_idx;
+
+		res = vkAllocateMemory(device_, &alloc_info, nullptr, &buf_mem);
+		vkBindBufferMemory(device_, buf, buf_mem, 0);
+
+		return res == VK_SUCCESS;
+	}
+
+	void context::copy_buffer(VkBuffer src, VkBuffer dst, uint64_t size)
+	{
+		VkCommandBufferAllocateInfo cmd_info {};
+		cmd_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+		cmd_info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+		cmd_info.commandPool = command_pool_;
+		cmd_info.commandBufferCount = 1;
+
+		VkCommandBuffer cmd;
+		vkAllocateCommandBuffers(device_, &cmd_info, &cmd);
+
+		VkCommandBufferBeginInfo begin {};
+		begin.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+		begin.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+
+		vkBeginCommandBuffer(cmd, &begin);
+
+		VkBufferCopy2 region {};
+		region.sType = VK_STRUCTURE_TYPE_BUFFER_COPY_2;
+		region.size = size;
+		VkCopyBufferInfo2 copy {};
+		copy.sType = VK_STRUCTURE_TYPE_COPY_BUFFER_INFO_2;
+		copy.srcBuffer = src;
+		copy.dstBuffer = dst;
+		copy.regionCount = 1;
+		copy.pRegions = &region;
+
+		vkCmdCopyBuffer2(cmd, &copy);
+		vkEndCommandBuffer(cmd);
+
+		VkSubmitInfo submit {};
+		submit.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+		submit.commandBufferCount = 1;
+		submit.pCommandBuffers = &cmd;
+
+		vkQueueSubmit(graphics_queue_, 1, &submit, nullptr);
+		vkQueueWaitIdle(graphics_queue_);
+
+		vkFreeCommandBuffers(device_, command_pool_, 1, &cmd);
+	}
+
 	bool context::create_command_buffers()
 	{
 		VkCommandBufferAllocateInfo alloc_info {};
@@ -1090,7 +1278,13 @@ namespace vkb::vk
 		scissor.extent = swapchain_extent_;
 		vkCmdSetScissor(cmd, 0, 1, &scissor);
 
-		vkCmdDraw(cmd, 3, 1, 0, 0);
+		VkBuffer     buffs[] {vertex_buffer_};
+		VkDeviceSize offsets[] {0};
+		vkCmdBindVertexBuffers(cmd, 0, 1, buffs, offsets);
+
+		vkCmdBindIndexBuffer(cmd, index_buffer_, 0, VK_INDEX_TYPE_UINT16);
+
+		vkCmdDrawIndexed(cmd, triangle_.idcs.size(), 1, 0, 0, 0);
 
 		ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(),
 		                                command_buffers_[cur_frame_]);

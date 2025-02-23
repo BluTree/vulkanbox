@@ -44,7 +44,7 @@ namespace vkb
 		{
 			SetWindowLongPtrW(handle_, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(this));
 
-			// ShowWindow(handle_, SW_NORMAL);
+			ShowWindow(handle_, SW_NORMAL);
 		}
 	}
 

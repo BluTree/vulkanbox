@@ -21,6 +21,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char** argv)
 	ImGui_ImplVulkan_InitInfo init_info {};
 	ctx.fill_init_info(init_info);
 	ImGui_ImplVulkan_Init(&init_info);
+	bool demo {false};
 
 	bool running {ctx.created()};
 	// vkb::log::assert(running, "Failed to initialize Vulkan context");
@@ -32,7 +33,11 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char** argv)
 		ImGui_ImplVulkan_NewFrame();
 		ImGui_ImplWin32_NewFrame();
 		ImGui::NewFrame();
-		ImGui::ShowDemoWindow(nullptr);
+		if (ImGui::IsKeyPressed(ImGuiKey_Space))
+			demo = !demo;
+
+		if (demo)
+			ImGui::ShowDemoWindow(&demo);
 
 		if (!main_window.closed() && !main_window.minimized())
 		{

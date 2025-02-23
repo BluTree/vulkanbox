@@ -1,5 +1,7 @@
 #pragma once
 
+#include "object.hh"
+
 #include <array_view.hh>
 #include <string_view.hh>
 #include <vector.hh>
@@ -82,6 +84,12 @@ namespace vkb::vk
 		bool create_framebuffers();
 
 		bool create_command_pool();
+		bool create_vertex_buffer();
+		bool create_index_buffer();
+		bool create_buffer(VkDeviceSize size, VkBufferUsageFlags usage,
+		                   VkMemoryPropertyFlags props, VkBuffer& buf,
+		                   VkDeviceMemory& buf_mem);
+		void copy_buffer(VkBuffer src, VkBuffer dst, uint64_t size);
 		bool create_command_buffers();
 
 		bool create_sync_objects();
@@ -123,6 +131,10 @@ namespace vkb::vk
 		mc::vector<VkFramebuffer> framebuffers_;
 
 		VkCommandPool   command_pool_ {nullptr};
+		VkBuffer        vertex_buffer_ {nullptr};
+		VkDeviceMemory  vertex_buffer_memory_ {nullptr};
+		VkBuffer        index_buffer_ {nullptr};
+		VkDeviceMemory  index_buffer_memory_ {nullptr};
 		VkCommandBuffer command_buffers_[context::max_frames_in_flight] {nullptr};
 
 		VkSemaphore img_avail_semaphores_[context::max_frames_in_flight] {nullptr};
@@ -130,5 +142,7 @@ namespace vkb::vk
 		VkFence     in_flight_fences_[context::max_frames_in_flight] {nullptr};
 
 		VkDescriptorPool desc_pool_ {VK_NULL_HANDLE};
+
+		object triangle_;
 	};
 }
