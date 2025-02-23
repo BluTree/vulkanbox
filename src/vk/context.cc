@@ -232,14 +232,13 @@ namespace vkb::vk
 		return created_;
 	}
 
-	void context::draw()
+	void context::begin_draw()
 	{
 		vkWaitForFences(device_, 1, &in_flight_fences_[cur_frame_], VK_TRUE, UINT64_MAX);
 
-		uint32_t img_idx;
 		VkResult res = vkAcquireNextImageKHR(device_, swapchain_, UINT64_MAX,
 		                                     img_avail_semaphores_[cur_frame_],
-		                                     VK_NULL_HANDLE, &img_idx);
+		                                     VK_NULL_HANDLE, &img_idx_);
 
 		if (res == VK_ERROR_OUT_OF_DATE_KHR)
 		{
@@ -250,8 +249,40 @@ namespace vkb::vk
 		vkResetFences(device_, 1, &in_flight_fences_[cur_frame_]);
 
 		vkResetCommandBuffer(command_buffers_[cur_frame_], 0);
-		record_command_buffer(command_buffers_[cur_frame_], img_idx);
+		VkCommandBufferBeginInfo begin_info {};
+		begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+		begin_info.flags = 0;
+		begin_info.pInheritanceInfo = nullptr;
 
+		res = vkBeginCommandBuffer(command_buffers_[cur_frame_], &begin_info);
+		if (res != VK_SUCCESS)
+			return;
+
+		VkRenderPassBeginInfo render_pass_info {};
+		render_pass_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+		render_pass_info.renderPass = render_pass_;
+		render_pass_info.framebuffer = framebuffers_[img_idx_];
+		render_pass_info.renderArea.offset = {0, 0};
+		render_pass_info.renderArea.extent = swapchain_extent_;
+
+		VkClearValue clear_col {{{0.0f, 0.0f, 0.0f, 1.0f}}};
+		render_pass_info.clearValueCount = 1;
+		render_pass_info.pClearValues = &clear_col;
+
+		vkCmdBeginRenderPass(command_buffers_[cur_frame_], &render_pass_info,
+		                     VK_SUBPASS_CONTENTS_INLINE);
+	}
+
+	void context::draw()
+	{
+		record_command_buffer(command_buffers_[cur_frame_]);
+	}
+
+	void context::present()
+	{
+		vkCmdEndRenderPass(command_buffers_[cur_frame_]);
+
+		vkEndCommandBuffer(command_buffers_[cur_frame_]);
 		VkSubmitInfo submit_info {};
 		submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 
@@ -278,9 +309,9 @@ namespace vkb::vk
 		VkSwapchainKHR swapchains[] {swapchain_};
 		present_info.swapchainCount = 1;
 		present_info.pSwapchains = swapchains;
-		present_info.pImageIndices = &img_idx;
+		present_info.pImageIndices = &img_idx_;
 
-		res = vkQueuePresentKHR(present_queue_, &present_info);
+		VkResult res = vkQueuePresentKHR(present_queue_, &present_info);
 		if (res == VK_ERROR_OUT_OF_DATE_KHR || res == VK_SUBOPTIMAL_KHR)
 			recreate_swapchain();
 
@@ -301,6 +332,11 @@ namespace vkb::vk
 		init_info.ImageCount = context::max_frames_in_flight;
 		init_info.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
 		init_info.Allocator = nullptr;
+	}
+
+	VkCommandBuffer context::current_command_buffer()
+	{
+		return command_buffers_[cur_frame_];
 	}
 
 	void context::wait_completion()
@@ -1238,30 +1274,8 @@ namespace vkb::vk
 		return res == VK_SUCCESS;
 	}
 
-	bool context::record_command_buffer(VkCommandBuffer cmd, uint32_t img_idx)
+	void context::record_command_buffer(VkCommandBuffer cmd)
 	{
-		VkCommandBufferBeginInfo begin_info {};
-		begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-		begin_info.flags = 0;
-		begin_info.pInheritanceInfo = nullptr;
-
-		VkResult res = vkBeginCommandBuffer(cmd, &begin_info);
-		if (res != VK_SUCCESS)
-			return false;
-
-		VkRenderPassBeginInfo render_pass_info {};
-		render_pass_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-		render_pass_info.renderPass = render_pass_;
-		render_pass_info.framebuffer = framebuffers_[img_idx];
-		render_pass_info.renderArea.offset = {0, 0};
-		render_pass_info.renderArea.extent = swapchain_extent_;
-
-		VkClearValue clear_col {{{0.0f, 0.0f, 0.0f, 1.0f}}};
-		render_pass_info.clearValueCount = 1;
-		render_pass_info.pClearValues = &clear_col;
-
-		vkCmdBeginRenderPass(cmd, &render_pass_info, VK_SUBPASS_CONTENTS_INLINE);
-
 		vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, graphics_pipe_);
 
 		VkViewport viewport {};
@@ -1285,14 +1299,6 @@ namespace vkb::vk
 		vkCmdBindIndexBuffer(cmd, index_buffer_, 0, VK_INDEX_TYPE_UINT16);
 
 		vkCmdDrawIndexed(cmd, triangle_.idcs.size(), 1, 0, 0, 0);
-
-		ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(),
-		                                command_buffers_[cur_frame_]);
-
-		vkCmdEndRenderPass(cmd);
-
-		res = vkEndCommandBuffer(cmd);
-		return res != VK_SUCCESS;
 	}
 
 	void context::recreate_swapchain()

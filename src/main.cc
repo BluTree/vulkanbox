@@ -1,27 +1,15 @@
+#include "ui/context.hh"
 #include "vk/context.hh"
 #include "win/window.hh"
 
 #include "log.hh"
 
-#include <imgui/backends/imgui_impl_vulkan.h>
-#include <imgui/backends/imgui_impl_win32.h>
-#include <imgui/imgui.h>
-
 int main([[maybe_unused]] int argc, [[maybe_unused]] char** argv)
 {
-	vkb::window      main_window;
-	vkb::vk::context ctx(main_window);
-
-	ImGui::CreateContext();
-	ImGuiIO& io = ImGui::GetIO();
-	io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
-
-	ImGui_ImplWin32_Init(main_window.native_handle());
-
-	ImGui_ImplVulkan_InitInfo init_info {};
-	ctx.fill_init_info(init_info);
-	ImGui_ImplVulkan_Init(&init_info);
-	bool demo {false};
+	using namespace vkb;
+	window      main_window;
+	vk::context ctx(main_window);
+	ui::context ui_ctx(main_window, ctx);
 
 	bool running {ctx.created()};
 	// vkb::log::assert(running, "Failed to initialize Vulkan context");
@@ -29,20 +17,14 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char** argv)
 	while (running)
 	{
 		main_window.update();
-
-		ImGui_ImplVulkan_NewFrame();
-		ImGui_ImplWin32_NewFrame();
-		ImGui::NewFrame();
-		if (ImGui::IsKeyPressed(ImGuiKey_Space))
-			demo = !demo;
-
-		if (demo)
-			ImGui::ShowDemoWindow(&demo);
+		ui_ctx.update();
 
 		if (!main_window.closed() && !main_window.minimized())
 		{
-			ImGui::Render();
+			ctx.begin_draw();
 			ctx.draw();
+			ui_ctx.draw();
+			ctx.present();
 		}
 
 		if (main_window.closed())
@@ -50,8 +32,5 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char** argv)
 	}
 
 	ctx.wait_completion();
-	ImGui_ImplVulkan_Shutdown();
-	ImGui_ImplWin32_Shutdown();
-	ImGui::DestroyContext();
 	return 0;
 }

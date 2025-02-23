@@ -27,15 +27,20 @@ namespace vkb::vk
 
 		bool created() const;
 
+		void begin_draw();
 		void draw();
+		void present();
 
 		void fill_init_info(ImGui_ImplVulkan_InitInfo& init_info);
+
+		VkCommandBuffer current_command_buffer();
 
 		void wait_completion();
 
 	private:
 		constexpr static uint8_t max_frames_in_flight {2};
 		uint8_t                  cur_frame_ {0};
+		uint32_t                 img_idx_ {0};
 
 		static VKAPI_ATTR VkBool32 VKAPI_CALL debug_callback(
 			VkDebugUtilsMessageSeverityFlagBitsEXT      message_level,
@@ -96,7 +101,7 @@ namespace vkb::vk
 
 		bool create_descriptor_pool();
 
-		bool record_command_buffer(VkCommandBuffer cmd, uint32_t img_idx);
+		void record_command_buffer(VkCommandBuffer cmd);
 
 		void recreate_swapchain();
 
