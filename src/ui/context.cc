@@ -36,6 +36,7 @@ namespace vkb::ui
 		ImGui_ImplVulkan_NewFrame();
 		ImGui_ImplWin32_NewFrame();
 		ImGui::NewFrame();
+
 		if (ImGui::IsKeyPressed(ImGuiKey_Space))
 			demo_ = !demo_;
 

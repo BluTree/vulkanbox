@@ -1321,8 +1321,3 @@ namespace vkb::vk
 			log::error("Cannot recreate swapchain");
 	}
 } // namespace vkb::vk
-
-// __int64 __cdecl ImGui_ImplWin32_WndProcHandler(struct HWND__ *,unsigned int,unsigned
-// __int64,__int64)
-// __int64 __cdecl ImGui_ImplWin32_WndProcHandler(void *,unsigned int,unsigned
-// __int64,__int64)
