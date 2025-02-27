@@ -4,12 +4,17 @@
 
 #include <initializer_list.hh>
 
+#include "vec4.hh"
+
 namespace vkb
 {
 	class mat4
 	{
 	public:
 		static mat4 identity;
+		static mat4 scale(vec4 scale);
+		static mat4 rotate(vec4 axis, float angle);
+		static mat4 translate(vec4 trans);
 
 		mat4();
 		mat4(float arr[4][4]);
