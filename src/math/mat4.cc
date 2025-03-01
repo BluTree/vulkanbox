@@ -55,10 +55,72 @@ namespace vkb
 	{
 		// clang-format off
 		return {
-			0.f, 0.f, 0.f, trans.x,
-			0.f, 0.f, 0.f, trans.y,
-			0.f, 0.f, 0.f, trans.z,
+			1.f, 0.f, 0.f, trans.x,
+			0.f, 1.f, 0.f, trans.y,
+			0.f, 0.f, 1.f, trans.z,
 			0.f, 0.f, 0.f, 1.f,
+		};
+		// clang-format on
+	}
+
+	mat4 mat4::persp_proj(float near, float far, float asp_ratio, float fov,
+	                      fov_axis axis)
+	{
+		float fov_tan = tanf(fov / 2.f);
+		float r;
+		float t;
+		if (axis == fov_axis::y)
+		{
+			t = near * fov_tan;
+			r = t * asp_ratio;
+		}
+		else
+		{
+			r = near * fov_tan;
+			t = r / asp_ratio;
+		}
+
+		float nf = -(far + near) / (far - near);
+		float nf2 = -(2 * far * near) / (far - near);
+
+		// clang-format off
+		return {
+			near / r, 0.f,       0.f,  0.f,
+			0.f,      -near / t, 0.f,  0.f,
+			0.f,      0.f,       nf,   nf2,
+			0.f,      0.f,       -1.f, 0.f
+		};
+		// clang-format on
+	}
+
+	mat4 mat4::ortho_proj(float near, float far, float l, float r, float t, float b)
+	{
+		float rl = -(r + l) / (r - l);
+		float tb = -(t + b) / (t - b);
+		float nf = -2 / (far - near);
+		float nf2 = -(far + near) / (far - near);
+		// clang-format off
+		return {
+			2 / (r - l), 0.f,               0.f, rl,
+			0.f,              -2 / (t - b), 0.f, tb,
+			0.f,              0.f,          nf,  nf2,
+			0.f,              0.f,          0.f, 1.f
+		};
+		// clang-format on
+	}
+
+	mat4 mat4::look_at(vec4 eye, vec4 at, vec4 up)
+	{
+		vec4 z = (at - eye).norm3();
+		vec4 x = z.cross3(up).norm3();
+		vec4 y = x.cross3(z);
+
+		// clang-format off
+		return {
+			x.x,  x.y,  x.z,  -x.dot3(eye),
+			y.x,  y.y,  y.z,  -y.dot3(eye),
+			-z.x, -z.y, -z.z, z.dot3(eye),
+			0.f, 0.f, 0.f, 1.f
 		};
 		// clang-format on
 	}
@@ -75,12 +137,14 @@ namespace vkb
 
 	mat4::mat4(float arr[16])
 	{
-		memcpy(arr_, arr, 16 * sizeof(float));
+		for (uint32_t i {0}; i < 16; ++i)
+			arr_[i % 4][i / 4] = arr[i];
 	}
 
 	mat4::mat4(std::initializer_list<float> arr)
 	{
-		memcpy(arr_, arr.begin(), 16 * sizeof(float));
+		for (uint32_t i {0}; i < 16; ++i)
+			arr_[i % 4][i / 4] = arr.begin()[i];
 	}
 
 	float* mat4::operator[](uint8_t i) &

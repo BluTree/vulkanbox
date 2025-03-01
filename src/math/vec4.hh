@@ -27,6 +27,7 @@ namespace vkb
 		vec4 cross3(vec4 vec) const;
 
 		vec4  norm() const;
+		vec4  norm3() const;
 		float dot(vec4 vec) const;
 		float dot3(vec4 vec) const;
 

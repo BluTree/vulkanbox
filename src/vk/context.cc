@@ -1,5 +1,6 @@
 #include "context.hh"
 #include "../log.hh"
+#include "../math/trig.hh"
 #include "../win/window.hh"
 
 #include <imgui/backends/imgui_impl_vulkan.h>
@@ -44,12 +45,20 @@ namespace vkb::vk
 	: win_ {win}
 	{
 		triangle_.verts = {
-			{{-0.5f, -0.5f, 0.0f, 1.0f}, {1.0f, 0.0f, 0.0f, 1.0f}},
-			{{0.5f, -0.5f, 0.0f, 1.0f},  {0.0f, 0.0f, 1.0f, 1.0f}},
-			{{0.5f, 0.5f, 0.0f, 1.0f},   {0.0f, 1.0f, 0.0f, 1.0f}},
-			{{-0.5f, 0.5f, 0.0f, 1.0f},  {1.0f, 1.0f, 1.0f, 1.0f}}
+			{{-1.0f, -1.0f, -0.0f, 1.0f}, {1.0f, 0.0f, 0.0f, 1.0f}},
+			{{1.0f, -1.0f, -0.0f, 1.0f},  {0.0f, 0.0f, 1.0f, 1.0f}},
+			{{1.0f, 1.0f, -0.0f, 1.0f},   {0.0f, 1.0f, 0.0f, 1.0f}},
+			{{-1.0f, 1.0f, -0.0f, 1.0f},  {1.0f, 1.0f, 1.0f, 1.0f}},
+			{{-1.0f, -1.0f, 1.0f, 1.0f},  {1.0f, 0.0f, 0.0f, 1.0f}},
+			{{1.0f, -1.0f, 1.0f, 1.0f},   {0.0f, 0.0f, 1.0f, 1.0f}},
+			{{1.0f, 1.0f, 1.0f, 1.0f},    {0.0f, 1.0f, 0.0f, 1.0f}},
+			{{-1.0f, 1.0f, 1.0f, 1.0f},   {1.0f, 1.0f, 1.0f, 1.0f}}
         };
 		triangle_.idcs = {0, 1, 2, 0, 2, 3};
+		triangle_.model = mat4::rotate({0.f, 0.f, 1.f, 1.f}, rad(45));
+		auto [w, h] = win_.size();
+		proj_ = mat4::persp_proj(0.1f, 10.f, w / (float)h, rad(70));
+		view_ = mat4::look_at({0.f, 2.f, 2.f, 1.f}, vec4(), {0.f, 0.f, 1.f, 1.f});
 
 		created_ = create_instance();
 		if (!created_)
@@ -107,6 +116,13 @@ namespace vkb::vk
 			return;
 		}
 
+		created_ = create_desc_set_layout();
+		if (!created_)
+		{
+			log::error("Failed to create descriptor set layout");
+			return;
+		}
+
 		created_ = create_graphics_pipeline();
 		if (!created_)
 		{
@@ -142,6 +158,13 @@ namespace vkb::vk
 			return;
 		}
 
+		created_ = create_uniform_buffers();
+		if (!created_)
+		{
+			log::error("Failed to create uniform buffers");
+			return;
+		}
+
 		created_ = create_command_buffers();
 		if (!created_)
 		{
@@ -155,10 +178,18 @@ namespace vkb::vk
 			log::error("Failed to create synchronization objects");
 			return;
 		}
+
 		created_ = create_descriptor_pool();
 		if (!created_)
 		{
 			log::error("Failed to create descriptor pool");
+			return;
+		}
+
+		created_ = create_descriptor_sets();
+		if (!created_)
+		{
+			log::error("Failed to create descriptor sets");
 			return;
 		}
 	}
@@ -178,6 +209,11 @@ namespace vkb::vk
 				vkDestroySemaphore(device_, draw_end_semaphores_[i], nullptr);
 			if (img_avail_semaphores_[i])
 				vkDestroySemaphore(device_, img_avail_semaphores_[i], nullptr);
+			if (uniform_buffers_[i])
+			{
+				vkDestroyBuffer(device_, uniform_buffers_[i], nullptr);
+				vkFreeMemory(device_, uniform_buffers_memory_[i], nullptr);
+			}
 		}
 
 		if (index_buffer_memory_)
@@ -202,6 +238,9 @@ namespace vkb::vk
 			vkDestroyPipeline(device_, graphics_pipe_, nullptr);
 		if (pipe_layout_)
 			vkDestroyPipelineLayout(device_, pipe_layout_, nullptr);
+		if (desc_set_layout_)
+			vkDestroyDescriptorSetLayout(device_, desc_set_layout_, nullptr);
+
 		if (render_pass_)
 			vkDestroyRenderPass(device_, render_pass_, nullptr);
 
@@ -275,6 +314,18 @@ namespace vkb::vk
 
 	void context::draw()
 	{
+		struct
+		{
+			alignas(16) mat4 model;
+			alignas(16) mat4 view;
+			alignas(16) mat4 proj;
+		} ubo;
+
+		ubo.model = triangle_.model;
+		ubo.view = view_;
+		ubo.proj = proj_;
+		memcpy(uniform_buffers_map_[cur_frame_], &ubo, sizeof(ubo));
+
 		record_command_buffer(command_buffers_[cur_frame_]);
 	}
 
@@ -840,6 +891,24 @@ namespace vkb::vk
 		return res == VK_SUCCESS;
 	}
 
+	bool context::create_desc_set_layout()
+	{
+		VkDescriptorSetLayoutBinding ubo_binding {};
+		ubo_binding.binding = 0;
+		ubo_binding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+		ubo_binding.descriptorCount = 1;
+		ubo_binding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+
+		VkDescriptorSetLayoutCreateInfo create_info {};
+		create_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+		create_info.bindingCount = 1;
+		create_info.pBindings = &ubo_binding;
+
+		VkResult res = vkCreateDescriptorSetLayout(device_, &create_info, nullptr,
+		                                           &desc_set_layout_);
+		return res == VK_SUCCESS;
+	}
+
 	bool context::create_graphics_pipeline()
 	{
 		VkShaderModule vert_shader;
@@ -951,7 +1020,7 @@ namespace vkb::vk
 		rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
 		rasterizer.lineWidth = 1.f;
 		rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
-		rasterizer.frontFace = VK_FRONT_FACE_CLOCKWISE;
+		rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
 
 		VkPipelineMultisampleStateCreateInfo msaa {};
 		msaa.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
@@ -987,7 +1056,8 @@ namespace vkb::vk
 
 		VkPipelineLayoutCreateInfo pipe_layout_info {};
 		pipe_layout_info.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-		pipe_layout_info.setLayoutCount = 0;
+		pipe_layout_info.setLayoutCount = 1;
+		pipe_layout_info.pSetLayouts = &desc_set_layout_;
 		pipe_layout_info.pushConstantRangeCount = 0;
 
 		if (vkCreatePipelineLayout(device_, &pipe_layout_info, nullptr, &pipe_layout_) !=
@@ -1136,6 +1206,24 @@ namespace vkb::vk
 		return res;
 	}
 
+	bool context::create_uniform_buffers()
+	{
+		uint64_t buf_size = 3 * sizeof(mat4);
+
+		for (uint32_t i {0}; i < context::max_frames_in_flight; ++i)
+		{
+			create_buffer(buf_size, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+			              VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+			                  VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+			              uniform_buffers_[i], uniform_buffers_memory_[i]);
+
+			vkMapMemory(device_, uniform_buffers_memory_[i], 0, buf_size, 0,
+			            &uniform_buffers_map_[i]);
+		}
+
+		return true;
+	}
+
 	bool context::create_buffer(VkDeviceSize size, VkBufferUsageFlags usage,
 	                            VkMemoryPropertyFlags props, VkBuffer& buf,
 	                            VkDeviceMemory& buf_mem)
@@ -1259,19 +1347,56 @@ namespace vkb::vk
 	{
 		VkDescriptorPoolSize pool_sizes[] = {
 			{VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-		     IMGUI_IMPL_VULKAN_MINIMUM_IMAGE_SAMPLER_POOL_SIZE},
-		};
-		VkDescriptorPoolCreateInfo pool_info = {};
+		     IMGUI_IMPL_VULKAN_MINIMUM_IMAGE_SAMPLER_POOL_SIZE                       },
+			{VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,         context::max_frames_in_flight}
+        };
+		VkDescriptorPoolCreateInfo pool_info {};
 		pool_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
 		pool_info.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
 		pool_info.maxSets = 0;
 		for (VkDescriptorPoolSize& pool_size : pool_sizes)
 			pool_info.maxSets += pool_size.descriptorCount;
-		pool_info.poolSizeCount = 1;
+		pool_info.poolSizeCount = 2;
 		pool_info.pPoolSizes = pool_sizes;
 		VkResult res = vkCreateDescriptorPool(device_, &pool_info, nullptr, &desc_pool_);
 
 		return res == VK_SUCCESS;
+	}
+
+	bool context::create_descriptor_sets()
+	{
+		VkDescriptorSetLayout layouts[context::max_frames_in_flight] {desc_set_layout_,
+		                                                              desc_set_layout_};
+		VkDescriptorSetAllocateInfo alloc_info {};
+		alloc_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+		alloc_info.descriptorPool = desc_pool_;
+		alloc_info.descriptorSetCount = context::max_frames_in_flight;
+		alloc_info.pSetLayouts = layouts;
+
+		VkResult res = vkAllocateDescriptorSets(device_, &alloc_info, desc_sets_);
+		if (res != VK_SUCCESS)
+			return false;
+
+		for (uint32_t i {0}; i < context::max_frames_in_flight; ++i)
+		{
+			VkDescriptorBufferInfo info {};
+			info.buffer = uniform_buffers_[i];
+			info.offset = 0;
+			info.range = 3 * sizeof(mat4);
+
+			VkWriteDescriptorSet write {};
+			write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+			write.dstSet = desc_sets_[i];
+			write.dstBinding = 0;
+			write.dstArrayElement = 0;
+			write.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+			write.descriptorCount = 1;
+			write.pBufferInfo = &info;
+
+			vkUpdateDescriptorSets(device_, 1, &write, 0, nullptr);
+		}
+
+		return true;
 	}
 
 	void context::record_command_buffer(VkCommandBuffer cmd)
@@ -1295,8 +1420,9 @@ namespace vkb::vk
 		VkBuffer     buffs[] {vertex_buffer_};
 		VkDeviceSize offsets[] {0};
 		vkCmdBindVertexBuffers(cmd, 0, 1, buffs, offsets);
-
 		vkCmdBindIndexBuffer(cmd, index_buffer_, 0, VK_INDEX_TYPE_UINT16);
+		vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe_layout_, 0, 1,
+		                        &desc_sets_[cur_frame_], 0, nullptr);
 
 		vkCmdDrawIndexed(cmd, triangle_.idcs.size(), 1, 0, 0, 0);
 	}
@@ -1317,6 +1443,9 @@ namespace vkb::vk
 		bool res = create_swapchain();
 		res &= create_image_views();
 		res &= create_framebuffers();
+
+		auto [w, h] = win_.size();
+		proj_ = mat4::persp_proj(0.1f, 10.f, w / (float)h, rad(70));
 		if (!res)
 			log::error("Cannot recreate swapchain");
 	}

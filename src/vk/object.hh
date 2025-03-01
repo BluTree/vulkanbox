@@ -1,5 +1,6 @@
 #pragma once
 
+#include "../math/mat4.hh"
 #include "../math/vec2.hh"
 #include "../math/vec4.hh"
 
@@ -23,6 +24,8 @@ namespace vkb::vk
 
 		mc::vector<vert>     verts;
 		mc::vector<uint16_t> idcs;
+
+		mat4 model;
 	};
 
 }

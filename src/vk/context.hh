@@ -1,5 +1,6 @@
 #pragma once
 
+#include "../math/mat4.hh"
 #include "object.hh"
 
 #include <array_view.hh>
@@ -13,6 +14,11 @@
 namespace vkb
 {
 	class window;
+
+	namespace ui
+	{
+		class context;
+	}
 }
 
 struct ImGui_ImplVulkan_InitInfo;
@@ -21,6 +27,8 @@ namespace vkb::vk
 {
 	class context
 	{
+		friend ui::context;
+
 	public:
 		context(window const& win);
 		~context();
@@ -82,6 +90,8 @@ namespace vkb::vk
 
 		bool create_render_pass();
 
+		bool create_desc_set_layout();
+
 		bool create_graphics_pipeline();
 
 		VkShaderModule create_shader(uint8_t* spirv, uint32_t spirv_size);
@@ -91,6 +101,7 @@ namespace vkb::vk
 		bool create_command_pool();
 		bool create_vertex_buffer();
 		bool create_index_buffer();
+		bool create_uniform_buffers();
 		bool create_buffer(VkDeviceSize size, VkBufferUsageFlags usage,
 		                   VkMemoryPropertyFlags props, VkBuffer& buf,
 		                   VkDeviceMemory& buf_mem);
@@ -100,6 +111,7 @@ namespace vkb::vk
 		bool create_sync_objects();
 
 		bool create_descriptor_pool();
+		bool create_descriptor_sets();
 
 		void record_command_buffer(VkCommandBuffer cmd);
 
@@ -129,9 +141,10 @@ namespace vkb::vk
 
 		VkRenderPass render_pass_ {nullptr};
 
-		VkPipelineLayout pipe_layout_ {nullptr};
-		VkPipeline       graphics_pipe_ {nullptr};
-		VkPipelineCache  pipe_cache_ {VK_NULL_HANDLE};
+		VkDescriptorSetLayout desc_set_layout_ {nullptr};
+		VkPipelineLayout      pipe_layout_ {nullptr};
+		VkPipeline            graphics_pipe_ {nullptr};
+		VkPipelineCache       pipe_cache_ {VK_NULL_HANDLE};
 
 		mc::vector<VkFramebuffer> framebuffers_;
 
@@ -140,6 +153,9 @@ namespace vkb::vk
 		VkDeviceMemory  vertex_buffer_memory_ {nullptr};
 		VkBuffer        index_buffer_ {nullptr};
 		VkDeviceMemory  index_buffer_memory_ {nullptr};
+		VkBuffer        uniform_buffers_[context::max_frames_in_flight] {nullptr};
+		VkDeviceMemory  uniform_buffers_memory_[context::max_frames_in_flight] {nullptr};
+		void*           uniform_buffers_map_[context::max_frames_in_flight] {nullptr};
 		VkCommandBuffer command_buffers_[context::max_frames_in_flight] {nullptr};
 
 		VkSemaphore img_avail_semaphores_[context::max_frames_in_flight] {nullptr};
@@ -147,7 +163,10 @@ namespace vkb::vk
 		VkFence     in_flight_fences_[context::max_frames_in_flight] {nullptr};
 
 		VkDescriptorPool desc_pool_ {VK_NULL_HANDLE};
+		VkDescriptorSet  desc_sets_[context::max_frames_in_flight] {nullptr};
 
 		object triangle_;
+		mat4   view_;
+		mat4   proj_;
 	};
 }

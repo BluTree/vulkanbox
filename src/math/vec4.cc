@@ -136,9 +136,16 @@ namespace vkb
 
 	vec4 vec4::norm() const
 	{
-		float len = sqrtf(x * x + y * y + z + z + w * w);
+		float len = sqrtf(x * x + y * y + z * z + w * w);
 
 		return {x / len, y / len, z / len, w / len};
+	}
+
+	vec4 vec4::norm3() const
+	{
+		float len = sqrtf(x * x + y * y + z * z);
+
+		return {x / len, y / len, z / len, 1.f};
 	}
 
 	float vec4::dot(vec4 vec) const
@@ -153,11 +160,11 @@ namespace vkb
 
 	float vec4::sq_len() const
 	{
-		return x * x + y * y + z + z + w * w;
+		return x * x + y * y + z * z + w * w;
 	}
 
 	float vec4::len() const
 	{
-		return sqrtf(x * x + y * y + z + z + w * w);
+		return sqrtf(x * x + y * y + z * z + w * w);
 	}
 }
