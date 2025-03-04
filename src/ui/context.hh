@@ -18,7 +18,7 @@ namespace vkb::ui
 		context(window& win, vk::context& vk);
 		~context();
 
-		void update();
+		void update(double dt);
 		void draw();
 
 	private:
@@ -26,5 +26,8 @@ namespace vkb::ui
 		vk::context& vk_;
 
 		bool demo_ {false};
+
+		double refresh {0.0};
+		float  fps {0.f};
 	};
 }

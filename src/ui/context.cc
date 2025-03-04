@@ -31,7 +31,7 @@ namespace vkb::ui
 		ImGui::DestroyContext();
 	}
 
-	void context::update()
+	void context::update(double dt)
 	{
 		ImGui_ImplVulkan_NewFrame();
 		ImGui_ImplWin32_NewFrame();
@@ -42,6 +42,30 @@ namespace vkb::ui
 
 		if (demo_)
 			ImGui::ShowDemoWindow(&demo_);
+
+		refresh += dt;
+		if (refresh >= .2)
+		{
+			refresh -= .2;
+			fps = ImGui::GetIO().Framerate;
+		}
+
+		ImGui::SetNextWindowPos(ImVec2(ImGui::GetMainViewport()->WorkPos.x + 10,
+		                               ImGui::GetMainViewport()->WorkPos.y + 10),
+		                        ImGuiCond_Always);
+		ImGui::SetNextWindowViewport(ImGui::GetMainViewport()->ID);
+		ImGui::SetNextWindowBgAlpha(0.5f);
+		ImGuiWindowFlags flags =
+			ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoDocking |
+			ImGuiWindowFlags_NoMove | ImGuiWindowFlags_AlwaysAutoResize |
+			ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoFocusOnAppearing |
+			ImGuiWindowFlags_NoNav;
+		if (ImGui::Begin("Overlay", nullptr, flags))
+		{
+			ImGuiIO& io = ImGui::GetIO();
+			ImGui::Text("%.2f (%.3f ms)", fps, io.DeltaTime * 1000.f);
+			ImGui::End();
+		}
 	}
 
 	void context::draw()

@@ -22,7 +22,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char** argv)
 		double      dt = time::elapsed_sec(last, now);
 		last = now;
 		main_window.update();
-		ui_ctx.update();
+		ui_ctx.update(dt);
 
 		if (!main_window.closed() && !main_window.minimized())
 		{
