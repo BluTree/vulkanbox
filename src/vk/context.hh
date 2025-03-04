@@ -36,7 +36,7 @@ namespace vkb::vk
 		bool created() const;
 
 		void begin_draw();
-		void draw();
+		void draw(double dt);
 		void present();
 
 		void fill_init_info(ImGui_ImplVulkan_InitInfo& init_info);
@@ -87,6 +87,8 @@ namespace vkb::vk
 		VkExtent2D         choose_swap_extent();
 		bool               create_swapchain();
 		bool               create_image_views();
+		bool create_image_view(VkImage& img, VkFormat format, VkImageAspectFlags flags,
+		                       VkImageView& img_view);
 
 		bool create_render_pass();
 
@@ -98,15 +100,31 @@ namespace vkb::vk
 
 		bool create_framebuffers();
 
-		bool create_command_pool();
+		bool     create_command_pool();
+		bool     create_depth_resources();
+		VkFormat find_supported_format(mc::array_view<VkFormat> formats,
+		                               VkImageTiling tiling, VkFormatFeatureFlags feats);
+
+		bool create_texture_image();
+		bool create_texture_image_view();
+		bool create_texture_sampler();
+		bool create_image(uint32_t w, uint32_t h, VkFormat format, VkImageTiling tiling,
+		                  VkImageUsageFlags usage, VkMemoryPropertyFlags props,
+		                  VkImage& image, VkDeviceMemory& mem);
+		void transition_image_layout(VkImage image, VkFormat format,
+		                             VkImageLayout old_layout, VkImageLayout new_layout);
+		void copy_buffer_to_image(VkBuffer buffer, VkImage image, uint32_t w, uint32_t h);
 		bool create_vertex_buffer();
 		bool create_index_buffer();
 		bool create_uniform_buffers();
 		bool create_buffer(VkDeviceSize size, VkBufferUsageFlags usage,
 		                   VkMemoryPropertyFlags props, VkBuffer& buf,
 		                   VkDeviceMemory& buf_mem);
-		void copy_buffer(VkBuffer src, VkBuffer dst, uint64_t size);
-		bool create_command_buffers();
+		uint32_t        find_mem_type_idx(uint32_t mem_prop, VkMemoryPropertyFlags props);
+		VkCommandBuffer begin_commands();
+		void            end_commands(VkCommandBuffer cmd);
+		void            copy_buffer(VkBuffer src, VkBuffer dst, uint64_t size);
+		bool            create_command_buffers();
 
 		bool create_sync_objects();
 
@@ -165,8 +183,18 @@ namespace vkb::vk
 		VkDescriptorPool desc_pool_ {VK_NULL_HANDLE};
 		VkDescriptorSet  desc_sets_[context::max_frames_in_flight] {nullptr};
 
-		object triangle_;
+		object obj_;
 		mat4   view_;
 		mat4   proj_;
+
+		VkImage        tex_img_ {nullptr};
+		VkDeviceMemory tex_img_buf_ {nullptr};
+		VkImageView    tex_img_view_ {nullptr};
+		VkSampler      tex_sampler_ {nullptr};
+
+		VkFormat       depth_fmt_;
+		VkImage        depth_img_ {nullptr};
+		VkDeviceMemory depth_img_buf_ {nullptr};
+		VkImageView    depth_img_view_ {nullptr};
 	};
 }

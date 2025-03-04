@@ -5,9 +5,15 @@
 
 #include <imgui/backends/imgui_impl_vulkan.h>
 #include <win32/misc.h>
+#define STB_IMAGE_IMPLEMENTATION
+#include <stb/stb_image.h>
 
 #include <vulkan/vulkan_win32.h>
 
+#ifdef VKB_WINDOWS
+#define _USE_MATH_DEFINES
+#endif
+#include <math.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -44,18 +50,18 @@ namespace vkb::vk
 	context::context(window const& win)
 	: win_ {win}
 	{
-		triangle_.verts = {
-			{{-1.0f, -1.0f, -0.0f, 1.0f}, {1.0f, 0.0f, 0.0f, 1.0f}},
-			{{1.0f, -1.0f, -0.0f, 1.0f},  {0.0f, 0.0f, 1.0f, 1.0f}},
-			{{1.0f, 1.0f, -0.0f, 1.0f},   {0.0f, 1.0f, 0.0f, 1.0f}},
-			{{-1.0f, 1.0f, -0.0f, 1.0f},  {1.0f, 1.0f, 1.0f, 1.0f}},
-			{{-1.0f, -1.0f, 1.0f, 1.0f},  {1.0f, 0.0f, 0.0f, 1.0f}},
-			{{1.0f, -1.0f, 1.0f, 1.0f},   {0.0f, 0.0f, 1.0f, 1.0f}},
-			{{1.0f, 1.0f, 1.0f, 1.0f},    {0.0f, 1.0f, 0.0f, 1.0f}},
-			{{-1.0f, 1.0f, 1.0f, 1.0f},   {1.0f, 1.0f, 1.0f, 1.0f}}
+		obj_.verts = {
+			{{-1.0f, -1.0f, 0.0f, 1.0f},  {1.0f, 0.0f, 0.0f, 1.0f}, {1.0f, 0.0f}},
+			{{1.0f, -1.0f, 0.0f, 1.0f},   {0.0f, 0.0f, 1.0f, 1.0f}, {0.0f, 0.0f}},
+			{{1.0f, 1.0f, 0.0f, 1.0f},    {0.0f, 1.0f, 0.0f, 1.0f}, {0.0f, 1.0f}},
+			{{-1.0f, 1.0f, 0.0f, 1.0f},   {1.0f, 1.0f, 1.0f, 1.0f}, {1.0f, 1.0f}},
+			{{-1.0f, -1.0f, -1.0f, 1.0f}, {1.0f, 0.0f, 0.0f, 1.0f}, {1.0f, 0.0f}},
+			{{1.0f, -1.0f, -1.0f, 1.0f},  {0.0f, 0.0f, 1.0f, 1.0f}, {0.0f, 0.0f}},
+			{{1.0f, 1.0f, -1.0f, 1.0f},   {0.0f, 1.0f, 0.0f, 1.0f}, {0.0f, 1.0f}},
+			{{-1.0f, 1.0f, -1.0f, 1.0f},  {1.0f, 1.0f, 1.0f, 1.0f}, {1.0f, 1.0f}}
         };
-		triangle_.idcs = {0, 1, 2, 0, 2, 3};
-		triangle_.model = mat4::rotate({0.f, 0.f, 1.f, 1.f}, rad(45));
+		obj_.idcs = {0, 1, 2, 0, 2, 3, 4, 5, 6, 4, 6, 7};
+		obj_.model = mat4::rotate({0.f, 0.f, 1.f, 1.f}, rad(45));
 		auto [w, h] = win_.size();
 		proj_ = mat4::persp_proj(0.1f, 10.f, w / (float)h, rad(70));
 		view_ = mat4::look_at({0.f, 2.f, 2.f, 1.f}, vec4(), {0.f, 0.f, 1.f, 1.f});
@@ -109,6 +115,20 @@ namespace vkb::vk
 			return;
 		}
 
+		created_ = create_command_pool();
+		if (!created_)
+		{
+			log::error("Failed to create command pool");
+			return;
+		}
+
+		created_ = create_depth_resources();
+		if (!created_)
+		{
+			log::error("Failed to create depth resources");
+			return;
+		}
+
 		created_ = create_render_pass();
 		if (!created_)
 		{
@@ -137,10 +157,24 @@ namespace vkb::vk
 			return;
 		}
 
-		created_ = create_command_pool();
+		created_ = create_texture_image();
 		if (!created_)
 		{
-			log::error("Failed to create command pool");
+			log::error("Failed to create texture image");
+			return;
+		}
+
+		created_ = create_texture_image_view();
+		if (!created_)
+		{
+			log::error("Failed to create texture image view");
+			return;
+		}
+
+		created_ = create_texture_sampler();
+		if (!created_)
+		{
+			log::error("Failed to create texture sampler");
 			return;
 		}
 
@@ -197,6 +231,22 @@ namespace vkb::vk
 	context::~context()
 	{
 		vkDeviceWaitIdle(device_);
+
+		if (depth_img_view_)
+			vkDestroyImageView(device_, depth_img_view_, nullptr);
+		if (depth_img_buf_)
+			vkFreeMemory(device_, depth_img_buf_, nullptr);
+		if (depth_img_)
+			vkDestroyImage(device_, depth_img_, nullptr);
+
+		if (tex_sampler_)
+			vkDestroySampler(device_, tex_sampler_, nullptr);
+		if (tex_img_view_)
+			vkDestroyImageView(device_, tex_img_view_, nullptr);
+		if (tex_img_buf_)
+			vkFreeMemory(device_, tex_img_buf_, nullptr);
+		if (tex_img_)
+			vkDestroyImage(device_, tex_img_, nullptr);
 
 		if (desc_pool_)
 			vkDestroyDescriptorPool(device_, desc_pool_, nullptr);
@@ -304,15 +354,19 @@ namespace vkb::vk
 		render_pass_info.renderArea.offset = {0, 0};
 		render_pass_info.renderArea.extent = swapchain_extent_;
 
-		VkClearValue clear_col {{{0.0f, 0.0f, 0.0f, 1.0f}}};
-		render_pass_info.clearValueCount = 1;
-		render_pass_info.pClearValues = &clear_col;
+		VkClearValue clear_col[2] {};
+		clear_col[0].color = {
+			{0.0f, 0.0f, 0.0f, 1.0f}
+        };
+		clear_col[1].depthStencil = {1.0f, 0};
+		render_pass_info.clearValueCount = 2;
+		render_pass_info.pClearValues = clear_col;
 
 		vkCmdBeginRenderPass(command_buffers_[cur_frame_], &render_pass_info,
 		                     VK_SUBPASS_CONTENTS_INLINE);
 	}
 
-	void context::draw()
+	void context::draw(double dt)
 	{
 		struct
 		{
@@ -321,7 +375,9 @@ namespace vkb::vk
 			alignas(16) mat4 proj;
 		} ubo;
 
-		ubo.model = triangle_.model;
+		obj_.rot = fmod(obj_.rot + dt, M_PI * 2.0);
+		obj_.model = mat4::rotate({0.f, 0.f, 1.f, 1.f}, obj_.rot);
+		ubo.model = obj_.model;
 		ubo.view = view_;
 		ubo.proj = proj_;
 		memcpy(uniform_buffers_map_[cur_frame_], &ubo, sizeof(ubo));
@@ -609,9 +665,9 @@ namespace vkb::vk
 			swapchain_support support = query_swapchain_support(devices[i]);
 			if (ext_found &&
 			    props.properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU &&
-			    feats.geometryShader && families.graphics != UINT32_MAX &&
-			    families.present != UINT32_MAX && !support.formats.empty() &&
-			    !support.present_modes.empty())
+			    feats.geometryShader && feats.samplerAnisotropy &&
+			    families.graphics != UINT32_MAX && families.present != UINT32_MAX &&
+			    !support.formats.empty() && !support.present_modes.empty())
 			{
 				selected = i;
 				queue_families_ = families;
@@ -704,7 +760,9 @@ namespace vkb::vk
 		}
 
 		VkPhysicalDeviceFeatures feats {};
-		VkDeviceCreateInfo       create_info {};
+		feats.samplerAnisotropy = VK_TRUE;
+
+		VkDeviceCreateInfo create_info {};
 		create_info.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
 		create_info.queueCreateInfoCount = queues.size();
 		create_info.pQueueCreateInfos = queues.data();
@@ -820,33 +878,36 @@ namespace vkb::vk
 	bool context::create_image_views()
 	{
 		swapchain_image_views_.resize(swapchain_images_.size());
+		bool res {true};
+		for (uint32_t i {0}; i < swapchain_images_.size(); ++i)
+			res &=
+				create_image_view(swapchain_images_[i], swapchain_format_.format,
+			                      VK_IMAGE_ASPECT_COLOR_BIT, swapchain_image_views_[i]);
 
+		return res;
+	}
+
+	bool context::create_image_view(VkImage& img, VkFormat format,
+	                                VkImageAspectFlags flags, VkImageView& img_view)
+	{
 		VkImageViewCreateInfo create_info {};
 		create_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
 		create_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
-		create_info.format = swapchain_format_.format;
+		create_info.image = img;
+		create_info.format = format;
 		create_info.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
 		create_info.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
 		create_info.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
 		create_info.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
-		create_info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		create_info.subresourceRange.aspectMask = flags;
 		create_info.subresourceRange.baseMipLevel = 0;
 		create_info.subresourceRange.levelCount = 1;
 		create_info.subresourceRange.baseArrayLayer = 0;
 		create_info.subresourceRange.layerCount = 1;
 
-		for (uint32_t i {0}; i < swapchain_images_.size(); ++i)
-		{
-			create_info.image = swapchain_images_[i];
+		VkResult res = vkCreateImageView(device_, &create_info, nullptr, &img_view);
 
-			VkResult res = vkCreateImageView(device_, &create_info, nullptr,
-			                                 &swapchain_image_views_[i]);
-
-			if (res != VK_SUCCESS)
-				return false;
-		}
-
-		return true;
+		return res == VK_SUCCESS;
 	}
 
 	bool context::create_render_pass()
@@ -865,23 +926,42 @@ namespace vkb::vk
 		color_attach_ref.attachment = 0;
 		color_attach_ref.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
+		VkAttachmentDescription depth_attachment {};
+		depth_attachment.format = depth_fmt_;
+		depth_attachment.samples = VK_SAMPLE_COUNT_1_BIT;
+		depth_attachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+		depth_attachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+		depth_attachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+		depth_attachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+		depth_attachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+		depth_attachment.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
+		VkAttachmentReference depth_attach_ref {};
+		depth_attach_ref.attachment = 1;
+		depth_attach_ref.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
 		VkSubpassDescription sub_pass {};
 		sub_pass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
 		sub_pass.colorAttachmentCount = 1;
 		sub_pass.pColorAttachments = &color_attach_ref;
+		sub_pass.pDepthStencilAttachment = &depth_attach_ref;
 
 		VkSubpassDependency dep {};
 		dep.srcSubpass = VK_SUBPASS_EXTERNAL;
 		dep.dstSubpass = 0;
-		dep.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+		dep.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT |
+		                   VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
 		dep.srcAccessMask = 0;
-		dep.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-		dep.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+		dep.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT |
+		                   VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
+		dep.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT |
+		                    VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
 
-		VkRenderPassCreateInfo create_info {};
+		VkAttachmentDescription attachments[] {color_attachment, depth_attachment};
+		VkRenderPassCreateInfo  create_info {};
 		create_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-		create_info.attachmentCount = 1;
-		create_info.pAttachments = &color_attachment;
+		create_info.attachmentCount = 2;
+		create_info.pAttachments = attachments;
 		create_info.subpassCount = 1;
 		create_info.pSubpasses = &sub_pass;
 		create_info.dependencyCount = 1;
@@ -899,10 +979,17 @@ namespace vkb::vk
 		ubo_binding.descriptorCount = 1;
 		ubo_binding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
 
+		VkDescriptorSetLayoutBinding sampler_binding {};
+		sampler_binding.binding = 1;
+		sampler_binding.descriptorCount = 1;
+		sampler_binding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		sampler_binding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+		VkDescriptorSetLayoutBinding    bindings[] {ubo_binding, sampler_binding};
 		VkDescriptorSetLayoutCreateInfo create_info {};
 		create_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-		create_info.bindingCount = 1;
-		create_info.pBindings = &ubo_binding;
+		create_info.bindingCount = 2;
+		create_info.pBindings = bindings;
 
 		VkResult res = vkCreateDescriptorSetLayout(device_, &create_info, nullptr,
 		                                           &desc_set_layout_);
@@ -973,7 +1060,7 @@ namespace vkb::vk
 		                                                 frag_create_info};
 
 		VkVertexInputBindingDescription binding_desc = object::binding_desc();
-		mc::array<VkVertexInputAttributeDescription, 2> attribute_descs =
+		mc::array<VkVertexInputAttributeDescription, 3> attribute_descs =
 			object::attribute_descs();
 
 		VkPipelineVertexInputStateCreateInfo vert_input_info {};
@@ -1054,6 +1141,12 @@ namespace vkb::vk
 		color_blend.blendConstants[2] = 0.f;
 		color_blend.blendConstants[3] = 0.f;
 
+		VkPipelineDepthStencilStateCreateInfo depth_stencil {};
+		depth_stencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+		depth_stencil.depthTestEnable = VK_TRUE;
+		depth_stencil.depthWriteEnable = VK_TRUE;
+		depth_stencil.depthCompareOp = VK_COMPARE_OP_LESS;
+
 		VkPipelineLayoutCreateInfo pipe_layout_info {};
 		pipe_layout_info.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 		pipe_layout_info.setLayoutCount = 1;
@@ -1079,6 +1172,7 @@ namespace vkb::vk
 		create_info.pRasterizationState = &rasterizer;
 		create_info.pMultisampleState = &msaa;
 		create_info.pColorBlendState = &color_blend;
+		create_info.pDepthStencilState = &depth_stencil;
 		create_info.pDynamicState = &dynamic_state;
 		create_info.layout = pipe_layout_;
 		create_info.renderPass = render_pass_;
@@ -1112,12 +1206,12 @@ namespace vkb::vk
 
 		for (uint32_t i {0}; i < framebuffers_.size(); ++i)
 		{
-			VkImageView attachments[] {swapchain_image_views_[i]};
+			VkImageView attachments[] {swapchain_image_views_[i], depth_img_view_};
 
 			VkFramebufferCreateInfo create_info {};
 			create_info.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
 			create_info.renderPass = render_pass_;
-			create_info.attachmentCount = 1;
+			create_info.attachmentCount = 2;
 			create_info.pAttachments = attachments;
 			create_info.width = swapchain_extent_.width;
 			create_info.height = swapchain_extent_.height;
@@ -1143,9 +1237,231 @@ namespace vkb::vk
 		return res == VK_SUCCESS;
 	}
 
+	bool context::create_depth_resources()
+	{
+		depth_fmt_ = find_supported_format(
+			{VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT,
+		     VK_FORMAT_D24_UNORM_S8_UINT},
+			VK_IMAGE_TILING_OPTIMAL, VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT);
+
+		bool res = create_image(
+			swapchain_extent_.width, swapchain_extent_.height, depth_fmt_,
+			VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
+			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, depth_img_, depth_img_buf_);
+
+		res &= create_image_view(depth_img_, depth_fmt_, VK_IMAGE_ASPECT_DEPTH_BIT,
+		                         depth_img_view_);
+		return res;
+	}
+
+	VkFormat context::find_supported_format(mc::array_view<VkFormat> formats,
+	                                        VkImageTiling            tiling,
+	                                        VkFormatFeatureFlags     feats)
+	{
+		for (uint32_t i {0}; i < formats.size(); ++i)
+		{
+			VkFormatProperties props;
+			vkGetPhysicalDeviceFormatProperties(phys_device_, formats[i], &props);
+			if (tiling == VK_IMAGE_TILING_LINEAR &&
+			    (props.linearTilingFeatures & feats) == feats)
+				return formats[i];
+			else if (tiling == VK_IMAGE_TILING_OPTIMAL &&
+			         (props.optimalTilingFeatures & feats) == feats)
+				return formats[i];
+		}
+
+		return VK_FORMAT_UNDEFINED;
+	}
+
+	bool context::create_texture_image()
+	{
+		int32_t  w, h, c;
+		uint8_t* pix = stbi_load("res/textures/tex.png", &w, &h, &c, STBI_rgb_alpha);
+		if (!pix)
+			return false;
+
+		uint64_t size = w * h * 4;
+
+		VkBuffer       staging_buf;
+		VkDeviceMemory staging_buf_mem;
+		create_buffer(size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+		              VK_MEMORY_PROPERTY_HOST_COHERENT_BIT |
+		                  VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT,
+		              staging_buf, staging_buf_mem);
+
+		void* data;
+		vkMapMemory(device_, staging_buf_mem, 0, size, 0, &data);
+		memcpy(data, pix, size);
+		vkUnmapMemory(device_, staging_buf_mem);
+
+		stbi_image_free(pix);
+
+		create_image(w, h, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_TILING_OPTIMAL,
+		             VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+		             VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, tex_img_, tex_img_buf_);
+
+		transition_image_layout(tex_img_, VK_FORMAT_R8G8B8A8_SRGB,
+		                        VK_IMAGE_LAYOUT_UNDEFINED,
+		                        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+		copy_buffer_to_image(staging_buf, tex_img_, w, h);
+		transition_image_layout(tex_img_, VK_FORMAT_R8G8B8A8_SRGB,
+		                        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+		                        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+
+		vkDestroyBuffer(device_, staging_buf, nullptr);
+		vkFreeMemory(device_, staging_buf_mem, nullptr);
+
+		return true;
+	}
+
+	bool context::create_texture_image_view()
+	{
+		return create_image_view(tex_img_, VK_FORMAT_R8G8B8A8_SRGB,
+		                         VK_IMAGE_ASPECT_COLOR_BIT, tex_img_view_);
+	}
+
+	bool context::create_texture_sampler()
+	{
+		VkSamplerCreateInfo sampler {};
+		sampler.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+		sampler.magFilter = VK_FILTER_NEAREST;
+		sampler.minFilter = VK_FILTER_NEAREST;
+		sampler.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+		sampler.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+		sampler.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+
+		VkPhysicalDeviceProperties props {};
+		vkGetPhysicalDeviceProperties(phys_device_, &props);
+		sampler.anisotropyEnable = VK_TRUE;
+		sampler.maxAnisotropy = props.limits.maxSamplerAnisotropy;
+
+		sampler.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_BLACK;
+		sampler.unnormalizedCoordinates = VK_FALSE;
+		sampler.compareEnable = VK_FALSE;
+		sampler.compareOp = VK_COMPARE_OP_ALWAYS;
+		sampler.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+
+		VkResult res = vkCreateSampler(device_, &sampler, nullptr, &tex_sampler_);
+		return res == VK_SUCCESS;
+	}
+
+	bool context::create_image(uint32_t w, uint32_t h, VkFormat format,
+	                           VkImageTiling tiling, VkImageUsageFlags usage,
+	                           VkMemoryPropertyFlags props, VkImage& image,
+	                           VkDeviceMemory& mem)
+	{
+		VkImageCreateInfo img_info {};
+		img_info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+		img_info.imageType = VK_IMAGE_TYPE_2D;
+		img_info.extent.width = w;
+		img_info.extent.height = h;
+		img_info.extent.depth = 1;
+		img_info.mipLevels = 1;
+		img_info.arrayLayers = 1;
+		img_info.format = format;
+		img_info.tiling = tiling;
+		img_info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+		img_info.usage = usage;
+		img_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+		img_info.samples = VK_SAMPLE_COUNT_1_BIT;
+
+		VkResult res = vkCreateImage(device_, &img_info, nullptr, &image);
+		if (res != VK_SUCCESS)
+			return false;
+
+		VkMemoryRequirements mem_req;
+		vkGetImageMemoryRequirements(device_, image, &mem_req);
+
+		VkMemoryAllocateInfo alloc_info {};
+		alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+		alloc_info.allocationSize = mem_req.size;
+		alloc_info.memoryTypeIndex = find_mem_type_idx(mem_req.memoryTypeBits, props);
+
+		res = vkAllocateMemory(device_, &alloc_info, nullptr, &mem);
+
+		vkBindImageMemory(device_, image, mem, 0);
+		return res == VK_SUCCESS;
+	}
+
+	void context::transition_image_layout(VkImage image, [[maybe_unused]] VkFormat format,
+	                                      VkImageLayout old_layout,
+	                                      VkImageLayout new_layout)
+	{
+		VkCommandBuffer cmd = begin_commands();
+
+		// TODO learn and use VK_KHR_synchronization2
+		VkImageMemoryBarrier barrier {};
+		barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+		barrier.oldLayout = old_layout;
+		barrier.newLayout = new_layout;
+		barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+		barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+		barrier.image = image;
+		barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		barrier.subresourceRange.baseMipLevel = 0;
+		barrier.subresourceRange.levelCount = 1;
+		barrier.subresourceRange.baseArrayLayer = 0;
+		barrier.subresourceRange.layerCount = 1;
+		barrier.srcAccessMask = 0;
+		barrier.dstAccessMask = 0;
+
+		VkPipelineStageFlags src_stage {VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT};
+		VkPipelineStageFlags dst_stage {VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT};
+
+		if (old_layout == VK_IMAGE_LAYOUT_UNDEFINED &&
+		    new_layout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL)
+		{
+			barrier.srcAccessMask = 0;
+			barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+
+			src_stage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+			dst_stage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+		}
+		else if (old_layout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL &&
+		         new_layout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
+		{
+			barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+			barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+
+			src_stage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+			dst_stage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+		}
+
+		vkCmdPipelineBarrier(cmd, src_stage, dst_stage, 0, 0, nullptr, 0, nullptr, 1,
+		                     &barrier);
+
+		end_commands(cmd);
+	}
+
+	void context::copy_buffer_to_image(VkBuffer buffer, VkImage image, uint32_t w,
+	                                   uint32_t h)
+	{
+		VkCommandBuffer cmd = begin_commands();
+
+		VkBufferImageCopy2 copy {};
+		copy.sType = VK_STRUCTURE_TYPE_BUFFER_IMAGE_COPY_2;
+		copy.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		copy.imageSubresource.layerCount = 1;
+		copy.imageExtent.width = w;
+		copy.imageExtent.height = h;
+		copy.imageExtent.depth = 1;
+
+		VkCopyBufferToImageInfo2 info {};
+		info.sType = VK_STRUCTURE_TYPE_COPY_BUFFER_TO_IMAGE_INFO_2;
+		info.srcBuffer = buffer;
+		info.dstImage = image;
+		info.regionCount = 1;
+		info.pRegions = &copy;
+		info.dstImageLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+
+		vkCmdCopyBufferToImage2(cmd, &info);
+
+		end_commands(cmd);
+	}
+
 	bool context::create_vertex_buffer()
 	{
-		uint64_t buf_size {sizeof(object::vert) * triangle_.verts.size()};
+		uint64_t buf_size {sizeof(object::vert) * obj_.verts.size()};
 
 		VkBuffer       staging_buf {nullptr};
 		VkDeviceMemory staging_buf_memory {nullptr};
@@ -1159,7 +1475,7 @@ namespace vkb::vk
 
 		void* buff_mem;
 		vkMapMemory(device_, staging_buf_memory, 0, buf_size, 0, &buff_mem);
-		memcpy(buff_mem, triangle_.verts.data(), buf_size);
+		memcpy(buff_mem, obj_.verts.data(), buf_size);
 		vkUnmapMemory(device_, staging_buf_memory);
 
 		res = create_buffer(
@@ -1177,7 +1493,7 @@ namespace vkb::vk
 
 	bool context::create_index_buffer()
 	{
-		uint64_t buf_size {sizeof(uint16_t) * triangle_.idcs.size()};
+		uint64_t buf_size {sizeof(uint16_t) * obj_.idcs.size()};
 
 		VkBuffer       staging_buf {nullptr};
 		VkDeviceMemory staging_buf_memory {nullptr};
@@ -1191,7 +1507,7 @@ namespace vkb::vk
 
 		void* buff_mem;
 		vkMapMemory(device_, staging_buf_memory, 0, buf_size, 0, &buff_mem);
-		memcpy(buff_mem, triangle_.idcs.data(), buf_size);
+		memcpy(buff_mem, obj_.idcs.data(), buf_size);
 		vkUnmapMemory(device_, staging_buf_memory);
 
 		res = create_buffer(
@@ -1240,18 +1556,8 @@ namespace vkb::vk
 
 		VkMemoryRequirements mem_req {};
 		vkGetBufferMemoryRequirements(device_, buf, &mem_req);
-		VkPhysicalDeviceMemoryProperties mem_props {};
-		vkGetPhysicalDeviceMemoryProperties(phys_device_, &mem_props);
-		uint32_t mem_type_idx {UINT32_MAX};
-		for (uint32_t i {0}; i < mem_props.memoryTypeCount; ++i)
-		{
-			if ((mem_req.memoryTypeBits & (1 << i)) &&
-			    ((mem_props.memoryTypes[i].propertyFlags & props) == props))
-			{
-				mem_type_idx = i;
-				break;
-			}
-		}
+
+		uint32_t mem_type_idx {find_mem_type_idx(mem_req.memoryTypeBits, props)};
 		if (mem_type_idx == UINT32_MAX)
 			return false;
 
@@ -1266,7 +1572,23 @@ namespace vkb::vk
 		return res == VK_SUCCESS;
 	}
 
-	void context::copy_buffer(VkBuffer src, VkBuffer dst, uint64_t size)
+	uint32_t context::find_mem_type_idx(uint32_t mem_prop, VkMemoryPropertyFlags props)
+	{
+		VkPhysicalDeviceMemoryProperties mem_props {};
+		vkGetPhysicalDeviceMemoryProperties(phys_device_, &mem_props);
+		for (uint32_t i {0}; i < mem_props.memoryTypeCount; ++i)
+		{
+			if ((mem_prop & (1 << i)) &&
+			    ((mem_props.memoryTypes[i].propertyFlags & props) == props))
+			{
+				return i;
+			}
+		}
+
+		return UINT32_MAX;
+	}
+
+	VkCommandBuffer context::begin_commands()
 	{
 		VkCommandBufferAllocateInfo cmd_info {};
 		cmd_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
@@ -1283,17 +1605,11 @@ namespace vkb::vk
 
 		vkBeginCommandBuffer(cmd, &begin);
 
-		VkBufferCopy2 region {};
-		region.sType = VK_STRUCTURE_TYPE_BUFFER_COPY_2;
-		region.size = size;
-		VkCopyBufferInfo2 copy {};
-		copy.sType = VK_STRUCTURE_TYPE_COPY_BUFFER_INFO_2;
-		copy.srcBuffer = src;
-		copy.dstBuffer = dst;
-		copy.regionCount = 1;
-		copy.pRegions = &region;
+		return cmd;
+	}
 
-		vkCmdCopyBuffer2(cmd, &copy);
+	void context::end_commands(VkCommandBuffer cmd)
+	{
 		vkEndCommandBuffer(cmd);
 
 		VkSubmitInfo submit {};
@@ -1305,6 +1621,25 @@ namespace vkb::vk
 		vkQueueWaitIdle(graphics_queue_);
 
 		vkFreeCommandBuffers(device_, command_pool_, 1, &cmd);
+	}
+
+	void context::copy_buffer(VkBuffer src, VkBuffer dst, uint64_t size)
+	{
+		VkCommandBuffer cmd = begin_commands();
+
+		VkBufferCopy2 region {};
+		region.sType = VK_STRUCTURE_TYPE_BUFFER_COPY_2;
+		region.size = size;
+		VkCopyBufferInfo2 copy {};
+		copy.sType = VK_STRUCTURE_TYPE_COPY_BUFFER_INFO_2;
+		copy.srcBuffer = src;
+		copy.dstBuffer = dst;
+		copy.regionCount = 1;
+		copy.pRegions = &region;
+
+		vkCmdCopyBuffer2(cmd, &copy);
+
+		end_commands(cmd);
 	}
 
 	bool context::create_command_buffers()
@@ -1347,7 +1682,7 @@ namespace vkb::vk
 	{
 		VkDescriptorPoolSize pool_sizes[] = {
 			{VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-		     IMGUI_IMPL_VULKAN_MINIMUM_IMAGE_SAMPLER_POOL_SIZE                       },
+		     context::max_frames_in_flight + 1                                       },
 			{VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,         context::max_frames_in_flight}
         };
 		VkDescriptorPoolCreateInfo pool_info {};
@@ -1379,21 +1714,35 @@ namespace vkb::vk
 
 		for (uint32_t i {0}; i < context::max_frames_in_flight; ++i)
 		{
-			VkDescriptorBufferInfo info {};
-			info.buffer = uniform_buffers_[i];
-			info.offset = 0;
-			info.range = 3 * sizeof(mat4);
+			VkDescriptorBufferInfo buf_info {};
+			buf_info.buffer = uniform_buffers_[i];
+			buf_info.offset = 0;
+			buf_info.range = 3 * sizeof(mat4);
 
-			VkWriteDescriptorSet write {};
-			write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-			write.dstSet = desc_sets_[i];
-			write.dstBinding = 0;
-			write.dstArrayElement = 0;
-			write.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-			write.descriptorCount = 1;
-			write.pBufferInfo = &info;
+			VkDescriptorImageInfo img_info {};
+			img_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+			img_info.imageView = tex_img_view_;
+			img_info.sampler = tex_sampler_;
 
-			vkUpdateDescriptorSets(device_, 1, &write, 0, nullptr);
+			VkWriteDescriptorSet write[2];
+			memset(write, 0, 2 * sizeof(VkWriteDescriptorSet));
+			write[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+			write[0].dstSet = desc_sets_[i];
+			write[0].dstBinding = 0;
+			write[0].dstArrayElement = 0;
+			write[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+			write[0].descriptorCount = 1;
+			write[0].pBufferInfo = &buf_info;
+
+			write[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+			write[1].dstSet = desc_sets_[i];
+			write[1].dstBinding = 1;
+			write[1].dstArrayElement = 0;
+			write[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+			write[1].descriptorCount = 1;
+			write[1].pImageInfo = &img_info;
+
+			vkUpdateDescriptorSets(device_, 2, write, 0, nullptr);
 		}
 
 		return true;
@@ -1424,12 +1773,19 @@ namespace vkb::vk
 		vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe_layout_, 0, 1,
 		                        &desc_sets_[cur_frame_], 0, nullptr);
 
-		vkCmdDrawIndexed(cmd, triangle_.idcs.size(), 1, 0, 0, 0);
+		vkCmdDrawIndexed(cmd, obj_.idcs.size(), 1, 0, 0, 0);
 	}
 
 	void context::recreate_swapchain()
 	{
 		vkDeviceWaitIdle(device_);
+
+		if (depth_img_view_)
+			vkDestroyImageView(device_, depth_img_view_, nullptr);
+		if (depth_img_buf_)
+			vkFreeMemory(device_, depth_img_buf_, nullptr);
+		if (depth_img_)
+			vkDestroyImage(device_, depth_img_, nullptr);
 
 		for (uint32_t i {0}; i < framebuffers_.size(); ++i)
 			vkDestroyFramebuffer(device_, framebuffers_[i], nullptr);
@@ -1442,6 +1798,7 @@ namespace vkb::vk
 		swapchain_support_ = query_swapchain_support(phys_device_);
 		bool res = create_swapchain();
 		res &= create_image_views();
+		res &= create_depth_resources();
 		res &= create_framebuffers();
 
 		auto [w, h] = win_.size();

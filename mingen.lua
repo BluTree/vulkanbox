@@ -7,23 +7,21 @@ end
 vulkan = require('deps/vulkan')
 imgui = require('deps/imgui')
 mincore = require('deps/mincore')
+stb = require('deps/stb')
 
-include_dirs = {}
+include_dirs = merge(
+	{mg.get_build_dir() .. 'deps/', 'src/'},
+	imgui.includes,
+	vulkan.includes,
+	mincore.includes
+	-- stb.includes
+)
+
 if (mg.platform() == 'windows') then
 	modular_win32 = require('deps/modular_win32')
 	include_dirs = merge(
-		{mg.get_build_dir() .. 'deps/', 'src/'},
-		imgui.includes,
-		vulkan.includes,
-		mincore.includes,
+		include_dirs,
 		modular_win32.includes
-	)
-else
-	include_dirs = merge(
-		{mg.get_build_dir() .. 'deps/', 'src/'},
-		imgui.includes,
-		vulkan.includes,
-		mincore.includes
 	)
 end
 
@@ -100,6 +98,15 @@ for i=1,#shaders do
 		input = shaders[i],
 		output = spirv,
 		cmd = 'glslc -fshader-stage=' .. shader_stage .. ' ${in} -o ${out}'
+	})
+end
+
+-- Textures
+textures = mg.collect_files('res/textures/*.png')
+for i=1,#textures do
+	mg.add_post_build_copy(vkb, {
+		input = textures[i],
+		output = mg.get_build_dir() .. 'bin/' .. textures[i];
 	})
 end
 

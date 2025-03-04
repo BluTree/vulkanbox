@@ -14,18 +14,20 @@ namespace vkb::vk
 	struct object
 	{
 		static VkVertexInputBindingDescription                 binding_desc();
-		static mc::array<VkVertexInputAttributeDescription, 2> attribute_descs();
+		static mc::array<VkVertexInputAttributeDescription, 3> attribute_descs();
 
 		struct vert
 		{
 			vec4 pos;
 			vec4 col;
+			vec2 uv;
 		};
 
 		mc::vector<vert>     verts;
 		mc::vector<uint16_t> idcs;
 
-		mat4 model;
+		mat4   model;
+		double rot {0.0};
 	};
 
 }

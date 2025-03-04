@@ -80,8 +80,8 @@ namespace vkb
 			t = r / asp_ratio;
 		}
 
-		float nf = -(far + near) / (far - near);
-		float nf2 = -(2 * far * near) / (far - near);
+		float nf = -(far) / (far - near);
+		float nf2 = -(far * near) / (far - near);
 
 		// clang-format off
 		return {
