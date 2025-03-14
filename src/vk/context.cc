@@ -793,7 +793,7 @@ namespace vkb::vk
 	VkPresentModeKHR context::choose_swap_present_mode()
 	{
 		for (uint32_t i {0}; i < swapchain_support_.present_modes.size(); ++i)
-			if (swapchain_support_.present_modes[i] == VK_PRESENT_MODE_MAILBOX_KHR)
+			if (swapchain_support_.present_modes[i] == VK_PRESENT_MODE_FIFO_KHR)
 				return swapchain_support_.present_modes[i];
 
 		return VK_PRESENT_MODE_FIFO_KHR;
@@ -880,15 +880,16 @@ namespace vkb::vk
 		swapchain_image_views_.resize(swapchain_images_.size());
 		bool res {true};
 		for (uint32_t i {0}; i < swapchain_images_.size(); ++i)
-			res &=
-				create_image_view(swapchain_images_[i], swapchain_format_.format,
-			                      VK_IMAGE_ASPECT_COLOR_BIT, swapchain_image_views_[i]);
+			res &= create_image_view(swapchain_images_[i], swapchain_format_.format,
+			                         VK_IMAGE_ASPECT_COLOR_BIT, 1,
+			                         swapchain_image_views_[i]);
 
 		return res;
 	}
 
 	bool context::create_image_view(VkImage& img, VkFormat format,
-	                                VkImageAspectFlags flags, VkImageView& img_view)
+	                                VkImageAspectFlags flags, uint32_t mip_lvl,
+	                                VkImageView& img_view)
 	{
 		VkImageViewCreateInfo create_info {};
 		create_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
@@ -904,6 +905,7 @@ namespace vkb::vk
 		create_info.subresourceRange.levelCount = 1;
 		create_info.subresourceRange.baseArrayLayer = 0;
 		create_info.subresourceRange.layerCount = 1;
+		create_info.subresourceRange.levelCount = mip_lvl;
 
 		VkResult res = vkCreateImageView(device_, &create_info, nullptr, &img_view);
 
@@ -1245,11 +1247,11 @@ namespace vkb::vk
 			VK_IMAGE_TILING_OPTIMAL, VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT);
 
 		bool res = create_image(
-			swapchain_extent_.width, swapchain_extent_.height, depth_fmt_,
+			swapchain_extent_.width, swapchain_extent_.height, 1, depth_fmt_,
 			VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
 			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, depth_img_, depth_img_buf_);
 
-		res &= create_image_view(depth_img_, depth_fmt_, VK_IMAGE_ASPECT_DEPTH_BIT,
+		res &= create_image_view(depth_img_, depth_fmt_, VK_IMAGE_ASPECT_DEPTH_BIT, 1,
 		                         depth_img_view_);
 		return res;
 	}
@@ -1280,6 +1282,7 @@ namespace vkb::vk
 		if (!pix)
 			return false;
 
+		mip_lvl_ = floor(log2(w > h ? w : h));
 		uint64_t size = w * h * 4;
 
 		VkBuffer       staging_buf;
@@ -1296,17 +1299,19 @@ namespace vkb::vk
 
 		stbi_image_free(pix);
 
-		create_image(w, h, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_TILING_OPTIMAL,
-		             VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+		create_image(w, h, mip_lvl_, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_TILING_OPTIMAL,
+		             VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT |
+		                 VK_IMAGE_USAGE_SAMPLED_BIT,
 		             VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, tex_img_, tex_img_buf_);
 
 		transition_image_layout(tex_img_, VK_FORMAT_R8G8B8A8_SRGB,
 		                        VK_IMAGE_LAYOUT_UNDEFINED,
-		                        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+		                        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, mip_lvl_);
 		copy_buffer_to_image(staging_buf, tex_img_, w, h);
-		transition_image_layout(tex_img_, VK_FORMAT_R8G8B8A8_SRGB,
-		                        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-		                        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+		// transition_image_layout(tex_img_, VK_FORMAT_R8G8B8A8_SRGB,
+		//                         VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+		//                         VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, mip_lvl_);
+		generate_mips(tex_img_, VK_FORMAT_R8G8B8A8_SRGB, w, h, mip_lvl_);
 
 		vkDestroyBuffer(device_, staging_buf, nullptr);
 		vkFreeMemory(device_, staging_buf_mem, nullptr);
@@ -1317,7 +1322,7 @@ namespace vkb::vk
 	bool context::create_texture_image_view()
 	{
 		return create_image_view(tex_img_, VK_FORMAT_R8G8B8A8_SRGB,
-		                         VK_IMAGE_ASPECT_COLOR_BIT, tex_img_view_);
+		                         VK_IMAGE_ASPECT_COLOR_BIT, mip_lvl_, tex_img_view_);
 	}
 
 	bool context::create_texture_sampler()
@@ -1329,6 +1334,10 @@ namespace vkb::vk
 		sampler.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
 		sampler.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
 		sampler.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+		sampler.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+		sampler.minLod = 0.f;
+		sampler.maxLod = mip_lvl_;
+		sampler.mipLodBias = 0.f;
 
 		VkPhysicalDeviceProperties props {};
 		vkGetPhysicalDeviceProperties(phys_device_, &props);
@@ -1345,7 +1354,7 @@ namespace vkb::vk
 		return res == VK_SUCCESS;
 	}
 
-	bool context::create_image(uint32_t w, uint32_t h, VkFormat format,
+	bool context::create_image(uint32_t w, uint32_t h, uint32_t mip_lvl, VkFormat format,
 	                           VkImageTiling tiling, VkImageUsageFlags usage,
 	                           VkMemoryPropertyFlags props, VkImage& image,
 	                           VkDeviceMemory& mem)
@@ -1364,6 +1373,7 @@ namespace vkb::vk
 		img_info.usage = usage;
 		img_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 		img_info.samples = VK_SAMPLE_COUNT_1_BIT;
+		img_info.mipLevels = mip_lvl;
 
 		VkResult res = vkCreateImage(device_, &img_info, nullptr, &image);
 		if (res != VK_SUCCESS)
@@ -1385,7 +1395,7 @@ namespace vkb::vk
 
 	void context::transition_image_layout(VkImage image, [[maybe_unused]] VkFormat format,
 	                                      VkImageLayout old_layout,
-	                                      VkImageLayout new_layout)
+	                                      VkImageLayout new_layout, uint32_t mip_lvl)
 	{
 		VkCommandBuffer cmd = begin_commands();
 
@@ -1399,7 +1409,7 @@ namespace vkb::vk
 		barrier.image = image;
 		barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 		barrier.subresourceRange.baseMipLevel = 0;
-		barrier.subresourceRange.levelCount = 1;
+		barrier.subresourceRange.levelCount = mip_lvl;
 		barrier.subresourceRange.baseArrayLayer = 0;
 		barrier.subresourceRange.layerCount = 1;
 		barrier.srcAccessMask = 0;
@@ -1455,6 +1465,88 @@ namespace vkb::vk
 		info.dstImageLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
 
 		vkCmdCopyBufferToImage2(cmd, &info);
+
+		end_commands(cmd);
+	}
+
+	void context::generate_mips(VkImage img, VkFormat format, uint32_t w, uint32_t h,
+	                            uint32_t mip_lvl)
+	{
+		VkFormatProperties props;
+		vkGetPhysicalDeviceFormatProperties(phys_device_, format, &props);
+		if (!(props.optimalTilingFeatures &
+		      VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT))
+			return;
+		VkCommandBuffer cmd = begin_commands();
+
+		VkImageMemoryBarrier barrier {};
+		barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+		barrier.image = img;
+		barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+		barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+		barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		barrier.subresourceRange.baseArrayLayer = 0;
+		barrier.subresourceRange.layerCount = 1;
+		barrier.subresourceRange.levelCount = 1;
+
+		int32_t mip_w = w;
+		int32_t mip_h = h;
+		for (uint32_t i {1}; i < mip_lvl; ++i)
+		{
+			barrier.subresourceRange.baseMipLevel = i - 1;
+			barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+			barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+			barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+			barrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+
+			vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TRANSFER_BIT,
+			                     VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 0,
+			                     nullptr, 1, &barrier);
+
+			VkImageBlit blit {};
+			blit.srcOffsets[0] = {0, 0, 0};
+			blit.srcOffsets[1] = {mip_w, mip_h, 1};
+			blit.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+			blit.srcSubresource.mipLevel = i - 1;
+			blit.srcSubresource.baseArrayLayer = 0;
+			blit.srcSubresource.layerCount = 1;
+
+			blit.dstOffsets[0] = {0, 0, 0};
+			blit.dstOffsets[1] = {mip_w > 1 ? mip_w / 2 : 1, mip_h > 1 ? mip_h / 2 : 1,
+			                      1};
+			blit.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+			blit.dstSubresource.mipLevel = i;
+			blit.dstSubresource.baseArrayLayer = 0;
+			blit.dstSubresource.layerCount = 1;
+
+			vkCmdBlitImage(cmd, img, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, img,
+			               VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &blit,
+			               VK_FILTER_LINEAR);
+
+			barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+			barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+			barrier.srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+			barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+
+			vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TRANSFER_BIT,
+			                     VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, nullptr, 0,
+			                     nullptr, 1, &barrier);
+
+			if (mip_w > 1)
+				mip_w /= 2;
+			if (mip_h > 1)
+				mip_h /= 2;
+		}
+
+		barrier.subresourceRange.baseMipLevel = mip_lvl - 1;
+		barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+		barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+		barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+
+		vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TRANSFER_BIT,
+		                     VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, nullptr, 0,
+		                     nullptr, 1, &barrier);
 
 		end_commands(cmd);
 	}

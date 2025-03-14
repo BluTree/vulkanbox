@@ -88,7 +88,7 @@ namespace vkb::vk
 		bool               create_swapchain();
 		bool               create_image_views();
 		bool create_image_view(VkImage& img, VkFormat format, VkImageAspectFlags flags,
-		                       VkImageView& img_view);
+		                       uint32_t mip_lvl, VkImageView& img_view);
 
 		bool create_render_pass();
 
@@ -108,12 +108,16 @@ namespace vkb::vk
 		bool create_texture_image();
 		bool create_texture_image_view();
 		bool create_texture_sampler();
-		bool create_image(uint32_t w, uint32_t h, VkFormat format, VkImageTiling tiling,
-		                  VkImageUsageFlags usage, VkMemoryPropertyFlags props,
-		                  VkImage& image, VkDeviceMemory& mem);
+		bool create_image(uint32_t w, uint32_t h, uint32_t mip_lvl, VkFormat format,
+		                  VkImageTiling tiling, VkImageUsageFlags usage,
+		                  VkMemoryPropertyFlags props, VkImage& image,
+		                  VkDeviceMemory& mem);
 		void transition_image_layout(VkImage image, VkFormat format,
-		                             VkImageLayout old_layout, VkImageLayout new_layout);
+		                             VkImageLayout old_layout, VkImageLayout new_layout,
+		                             uint32_t mip_lvl);
 		void copy_buffer_to_image(VkBuffer buffer, VkImage image, uint32_t w, uint32_t h);
+		void generate_mips(VkImage img, VkFormat format, uint32_t w, uint32_t h,
+		                   uint32_t mip_lvl);
 		bool create_vertex_buffer();
 		bool create_index_buffer();
 		bool create_uniform_buffers();
@@ -187,6 +191,7 @@ namespace vkb::vk
 		mat4   view_;
 		mat4   proj_;
 
+		uint32_t       mip_lvl_;
 		VkImage        tex_img_ {nullptr};
 		VkDeviceMemory tex_img_buf_ {nullptr};
 		VkImageView    tex_img_view_ {nullptr};
