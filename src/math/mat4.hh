@@ -35,6 +35,8 @@ namespace vkb
 		float*       operator[](uint8_t i) &;
 		float const* operator[](uint8_t i) const&;
 
+		mat4 operator*(mat4 const& other);
+
 		float const* operator[](uint8_t i) const&& = delete;
 
 	private:

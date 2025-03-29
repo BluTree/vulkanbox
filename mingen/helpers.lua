@@ -3,7 +3,7 @@ function merge(...)
 	res = {}
 	i = 1
 	for _,v in ipairs({...}) do
-		if type(v) == 'table' then
+		if type(v) == 'table' and v[1] ~= nil then
 			for j=1,#v do
 				res[i] = v[j]
 				i = i + 1

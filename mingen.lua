@@ -17,19 +17,14 @@ include_dirs = merge(
 	-- stb.includes
 )
 
+platform_define = {}
 if (mg.platform() == 'windows') then
-	modular_win32 = require('deps/modular_win32')
-	include_dirs = merge(
-		include_dirs,
-		modular_win32.includes
-	)
-end
-
-platform_define = ''
-if (mg.platform() == 'windows') then
-	platform_define = '-D"VKB_WINDOWS" -D"_CRT_SECURE_NO_WARNINGS"'
+	platform_define = {
+		'-D"VKB_WINDOWS"',
+		'-D"_CRT_SECURE_NO_WARNINGS"'
+	}
 elseif (mg.platform() == 'linux') then
-	platform_define = '-D"VKB_LINUX"'
+	platform_define = {'-D"VKB_LINUX"'}
 else
 	error("Unsupported platform")
 end
@@ -44,8 +39,30 @@ end
 platform_link_options = {}
 if (mg.platform() == 'windows') then
 	platform_link_options = {
-		'-Xlinker /incremental:no'
+		'-Xlinker /incremental:no',
+		'-Xlinker /nodefaultlib:libcmt.lib',
+		'-lmsvcrt.lib'
 	}
+end
+
+platform_deps = {}
+if (mg.platform() == 'windows') then
+	modular_win32 = require('deps/modular_win32')
+	superluminal = require('deps/superluminal')
+	if superluminal ~= nil then
+		include_dirs = merge(
+			include_dirs,
+			superluminal.includes,
+			modular_win32.includes
+		)
+		platform_deps = {superluminal.project}
+		table.insert(platform_define, '-D"USE_SUPERLUMINAL"')
+	else
+		include_dirs = merge(
+			include_dirs,
+			modular_win32.includes
+		)
+	end
 end
 
 local vkb = mg.project({
@@ -55,7 +72,10 @@ local vkb = mg.project({
 	includes = include_dirs,
 	compile_options = merge('-g', '-std=c++20', '-Wall', '-Wextra', '-Werror', platform_define, platform_compile_options),
 	link_options = merge('-g', platform_link_options),
-	dependencies = {imgui.project, vulkan.project, mincore.project}
+	dependencies = merge(imgui.project, vulkan.project, mincore.project, platform_deps),
+	release = {
+		compile_options = {'-O2'}
+	}
 })
 
 -- Manage list of source patterns that are platform specific

@@ -35,8 +35,11 @@ namespace vkb::vk
 
 		bool created() const;
 
+		bool init_object(object* obj);
+		void destroy_object(object* obj);
+
 		void begin_draw();
-		void draw(double dt);
+		void draw();
 		void present();
 
 		void fill_init_info(ImGui_ImplVulkan_InitInfo& init_info);
@@ -105,9 +108,9 @@ namespace vkb::vk
 		VkFormat find_supported_format(mc::array_view<VkFormat> formats,
 		                               VkImageTiling tiling, VkFormatFeatureFlags feats);
 
-		bool create_texture_image();
-		bool create_texture_image_view();
-		bool create_texture_sampler();
+		bool create_texture_image(object* obj);
+		bool create_texture_image_view(object* obj);
+		bool create_texture_sampler(object* obj);
 		bool create_image(uint32_t w, uint32_t h, uint32_t mip_lvl, VkFormat format,
 		                  VkImageTiling tiling, VkImageUsageFlags usage,
 		                  VkMemoryPropertyFlags props, VkImage& image,
@@ -118,8 +121,8 @@ namespace vkb::vk
 		void copy_buffer_to_image(VkBuffer buffer, VkImage image, uint32_t w, uint32_t h);
 		void generate_mips(VkImage img, VkFormat format, uint32_t w, uint32_t h,
 		                   uint32_t mip_lvl);
-		bool create_vertex_buffer();
-		bool create_index_buffer();
+		bool create_vertex_buffer(object* obj);
+		bool create_index_buffer(object* obj);
 		bool create_uniform_buffers();
 		bool create_buffer(VkDeviceSize size, VkBufferUsageFlags usage,
 		                   VkMemoryPropertyFlags props, VkBuffer& buf,
@@ -133,9 +136,9 @@ namespace vkb::vk
 		bool create_sync_objects();
 
 		bool create_descriptor_pool();
-		bool create_descriptor_sets();
+		bool create_descriptor_sets(object* obj);
 
-		void record_command_buffer(VkCommandBuffer cmd);
+		void record_command_buffer(VkCommandBuffer cmd, object* obj);
 
 		void recreate_swapchain();
 
@@ -171,13 +174,6 @@ namespace vkb::vk
 		mc::vector<VkFramebuffer> framebuffers_;
 
 		VkCommandPool   command_pool_ {nullptr};
-		VkBuffer        vertex_buffer_ {nullptr};
-		VkDeviceMemory  vertex_buffer_memory_ {nullptr};
-		VkBuffer        index_buffer_ {nullptr};
-		VkDeviceMemory  index_buffer_memory_ {nullptr};
-		VkBuffer        uniform_buffers_[context::max_frames_in_flight] {nullptr};
-		VkDeviceMemory  uniform_buffers_memory_[context::max_frames_in_flight] {nullptr};
-		void*           uniform_buffers_map_[context::max_frames_in_flight] {nullptr};
 		VkCommandBuffer command_buffers_[context::max_frames_in_flight] {nullptr};
 
 		VkSemaphore img_avail_semaphores_[context::max_frames_in_flight] {nullptr};
@@ -185,17 +181,15 @@ namespace vkb::vk
 		VkFence     in_flight_fences_[context::max_frames_in_flight] {nullptr};
 
 		VkDescriptorPool desc_pool_ {VK_NULL_HANDLE};
-		VkDescriptorSet  desc_sets_[context::max_frames_in_flight] {nullptr};
 
-		object obj_;
-		mat4   view_;
-		mat4   proj_;
+		VkBuffer       uniform_buffers_[context::max_frames_in_flight] {nullptr};
+		VkDeviceMemory uniform_buffers_memory_[context::max_frames_in_flight] {nullptr};
+		void*          uniform_buffers_map_[context::max_frames_in_flight] {nullptr};
 
-		uint32_t       mip_lvl_;
-		VkImage        tex_img_ {nullptr};
-		VkDeviceMemory tex_img_buf_ {nullptr};
-		VkImageView    tex_img_view_ {nullptr};
-		VkSampler      tex_sampler_ {nullptr};
+		mat4 view_;
+		mat4 proj_;
+
+		mc::vector<object*> objs_;
 
 		VkFormat       depth_fmt_;
 		VkImage        depth_img_ {nullptr};

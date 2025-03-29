@@ -4,6 +4,11 @@
 #include "win/window.hh"
 
 #include "log.hh"
+#include "math/trig.hh"
+
+#ifdef USE_SUPERLUMINAL
+#include <Superluminal/PerformanceAPI.h>
+#endif
 
 int main([[maybe_unused]] int argc, [[maybe_unused]] char** argv)
 {
@@ -16,26 +21,69 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char** argv)
 	// vkb::log::assert(running, "Failed to initialize Vulkan context");
 	time::stamp last = time::now();
 
+	mc::vector<vk::object> objs(2);
+	objs[0].verts = {
+		{{-1.0f, -1.0f, 0.0f, 1.0f},  {1.0f, 0.0f, 0.0f, 1.0f}, {1.0f, 0.0f}},
+		{{1.0f, -1.0f, 0.0f, 1.0f},   {0.0f, 0.0f, 1.0f, 1.0f}, {0.0f, 0.0f}},
+		{{1.0f, 1.0f, 0.0f, 1.0f},    {0.0f, 1.0f, 0.0f, 1.0f}, {0.0f, 1.0f}},
+		{{-1.0f, 1.0f, 0.0f, 1.0f},   {1.0f, 1.0f, 1.0f, 1.0f}, {1.0f, 1.0f}},
+		{{-1.0f, -1.0f, -1.0f, 1.0f}, {1.0f, 0.0f, 0.0f, 1.0f}, {1.0f, 0.0f}},
+		{{1.0f, -1.0f, -1.0f, 1.0f},  {0.0f, 0.0f, 1.0f, 1.0f}, {0.0f, 0.0f}},
+		{{1.0f, 1.0f, -1.0f, 1.0f},   {0.0f, 1.0f, 0.0f, 1.0f}, {0.0f, 1.0f}},
+		{{-1.0f, 1.0f, -1.0f, 1.0f},  {1.0f, 1.0f, 1.0f, 1.0f}, {1.0f, 1.0f}}
+    };
+	objs[0].idcs = {0, 1, 2, 0, 2, 3, 4, 5, 6, 4, 6, 7};
+	objs[0].model = mat4::rotate({0.f, 0.f, 1.f, 1.f}, rad(45));
+
+	objs[1].verts = {
+		{{-1.0f, -1.0f, 0.0f, 1.0f},  {1.0f, 0.0f, 0.0f, 1.0f}, {1.0f, 0.0f}},
+		{{1.0f, -1.0f, 0.0f, 1.0f},   {0.0f, 0.0f, 1.0f, 1.0f}, {0.0f, 0.0f}},
+		{{1.0f, 1.0f, 0.0f, 1.0f},    {0.0f, 1.0f, 0.0f, 1.0f}, {0.0f, 1.0f}},
+		{{-1.0f, 1.0f, 0.0f, 1.0f},   {1.0f, 1.0f, 1.0f, 1.0f}, {1.0f, 1.0f}},
+		{{-1.0f, -1.0f, -1.0f, 1.0f}, {1.0f, 0.0f, 0.0f, 1.0f}, {1.0f, 0.0f}},
+		{{1.0f, -1.0f, -1.0f, 1.0f},  {0.0f, 0.0f, 1.0f, 1.0f}, {0.0f, 0.0f}},
+		{{1.0f, 1.0f, -1.0f, 1.0f},   {0.0f, 1.0f, 0.0f, 1.0f}, {0.0f, 1.0f}},
+		{{-1.0f, 1.0f, -1.0f, 1.0f},  {1.0f, 1.0f, 1.0f, 1.0f}, {1.0f, 1.0f}}
+    };
+	objs[1].idcs = {0, 1, 2, 0, 2, 3, 4, 5, 6, 4, 6, 7};
+	objs[1].pos = {0.f, 2.f, .5f, 1.f};
+	objs[1].scale = {.5f, .5f, .5f, 1.f};
+
+	for (uint32_t i {0}; i < objs.size(); i++)
+		ctx.init_object(&objs[i]);
+
 	while (running)
 	{
+#ifdef USE_SUPERLUMINAL
+		PerformanceAPI_BeginEvent("Frame", nullptr, PERFORMANCEAPI_DEFAULT_COLOR);
+#endif
 		time::stamp now = time::now();
 		double      dt = time::elapsed_sec(last, now);
 		last = now;
 		main_window.update();
 		ui_ctx.update(dt);
 
+		for (uint32_t i {0}; i < objs.size(); i++)
+			objs[i].update(dt);
+
 		if (!main_window.closed() && !main_window.minimized())
 		{
 			ctx.begin_draw();
-			ctx.draw(dt);
+			ctx.draw();
 			ui_ctx.draw();
 			ctx.present();
 		}
 
 		if (main_window.closed())
 			running = false;
+#ifdef USE_SUPERLUMINAL
+		PerformanceAPI_EndEvent();
+#endif
 	}
 
 	ctx.wait_completion();
+
+	for (uint32_t i {0}; i < objs.size(); i++)
+		ctx.destroy_object(&objs[i]);
 	return 0;
 }

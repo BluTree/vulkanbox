@@ -5,5 +5,10 @@
 	],
 	"C_Cpp.codeAnalysis.exclude": {
 		"build/deps/**": true
+	},
+	"files.associations": {
+		"*.sln": "xml",
+		"log": "log",
+		"ios": "cpp"
 	}
 }

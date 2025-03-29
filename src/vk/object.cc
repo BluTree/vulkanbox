@@ -1,5 +1,11 @@
 #include "object.hh"
 
+#ifdef VKB_WINDOWS
+#define _USE_MATH_DEFINES
+#endif
+#include <math.h>
+#include <string.h>
+
 namespace vkb::vk
 {
 	VkVertexInputBindingDescription object::binding_desc()
@@ -32,5 +38,24 @@ namespace vkb::vk
 		res[2].offset = offsetof(vert, uv);
 
 		return res;
+	}
+
+	void object::update(double dt)
+	{
+		struct
+		{
+			alignas(16) mat4 view;
+			alignas(16) mat4 proj;
+		} ubo;
+
+		rot = fmod(rot + dt, M_PI * 2.0);
+		model = mat4::translate(pos) * mat4::rotate(vec4 {0.f, 0.f, 1.f, 1.f}, rot) *
+		        mat4::scale(scale);
+		// ubo.model = model;
+		// ubo.view = view;
+		// ubo.proj = proj;
+		// memcpy(uniform_buffers_map_[cur_frame_], &ubo, sizeof(ubo));
+
+		cur_frame_ = (cur_frame_ + 1) % 2;
 	}
 }

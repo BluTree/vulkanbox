@@ -156,4 +156,21 @@ namespace vkb
 	{
 		return arr_[i];
 	}
+
+	mat4 mat4::operator*(mat4 const& other)
+	{
+		mat4 res;
+
+		for (uint32_t i {0}; i < 4; ++i)
+		{
+			for (uint32_t j {0}; j < 4; ++j)
+			{
+				float val {0};
+				for (uint32_t k {0}; k < 4; ++k)
+					val += (*this)[k][j] * other[i][k];
+				res[i][j] = val;
+			}
+		}
+		return res;
+	}
 }

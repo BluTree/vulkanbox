@@ -14,7 +14,7 @@ local vulkan = mg.project({
 	name = 'vulkan',
 	type = mg.project_type.prebuilt,
 	static_libraries = {'vulkan-1.lib'},
-	static_library_directories = {vulkan_dir .. 'lib'}
+	static_library_directories = {vulkan_dir .. 'lib/'}
 })
 
 return {project = vulkan, includes = {vulkan_dir .. 'Include/'}}
