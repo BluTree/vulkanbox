@@ -202,6 +202,12 @@ namespace vkb::vk
 				vkDestroyBuffer(device_, uniform_buffers_[i], nullptr);
 				vkFreeMemory(device_, uniform_buffers_memory_[i], nullptr);
 			}
+
+			if (staging_uniform_buffers_[i])
+			{
+				vkDestroyBuffer(device_, staging_uniform_buffers_[i], nullptr);
+				vkFreeMemory(device_, staging_uniform_buffers_memory_[i], nullptr);
+			}
 		}
 
 		if (command_pool_)
@@ -247,7 +253,8 @@ namespace vkb::vk
 		return created_;
 	}
 
-	bool context::init_object(object* obj)
+	bool context::init_object(object* obj, mc::array_view<object::vert> verts,
+	                          mc::array_view<uint16_t> idcs)
 	{
 		bool init = create_texture_image(obj);
 		if (!init)
@@ -270,14 +277,14 @@ namespace vkb::vk
 			return init;
 		}
 
-		init = create_vertex_buffer(obj);
+		init = create_vertex_buffer(obj, verts);
 		if (!init)
 		{
 			log::error("Failed to create vertex buffer");
 			return init;
 		}
 
-		init = create_index_buffer(obj);
+		init = create_index_buffer(obj, idcs);
 		if (!init)
 		{
 			log::error("Failed to create index buffer");
@@ -351,6 +358,43 @@ namespace vkb::vk
 		if (res != VK_SUCCESS)
 			return;
 
+		struct
+		{
+			alignas(16) mat4 view;
+			alignas(16) mat4 proj;
+		} ubo;
+
+		ubo.view = view_;
+		ubo.proj = proj_;
+
+		void* buff_mem;
+		vkMapMemory(device_, staging_uniform_buffers_memory_[cur_frame_], 0, sizeof(ubo),
+		            0, &buff_mem);
+		memcpy(buff_mem, &ubo, sizeof(ubo));
+		vkUnmapMemory(device_, staging_uniform_buffers_memory_[cur_frame_]);
+
+		VkBufferCopy2 region {};
+		region.sType = VK_STRUCTURE_TYPE_BUFFER_COPY_2;
+		region.size = sizeof(ubo);
+		VkCopyBufferInfo2 copy {};
+		copy.sType = VK_STRUCTURE_TYPE_COPY_BUFFER_INFO_2;
+		copy.srcBuffer = staging_uniform_buffers_[cur_frame_];
+		copy.dstBuffer = uniform_buffers_[cur_frame_];
+		copy.regionCount = 1;
+		copy.pRegions = &region;
+
+		vkCmdCopyBuffer2(command_buffers_[cur_frame_], &copy);
+
+		VkBufferMemoryBarrier barrier {};
+		barrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
+		barrier.buffer = uniform_buffers_[cur_frame_];
+		barrier.size = sizeof(ubo);
+		barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+		barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+		vkCmdPipelineBarrier(command_buffers_[cur_frame_], VK_PIPELINE_STAGE_TRANSFER_BIT,
+		                     VK_PIPELINE_STAGE_VERTEX_SHADER_BIT, 0, 0, nullptr, 1,
+		                     &barrier, 0, nullptr);
+
 		VkRenderPassBeginInfo render_pass_info {};
 		render_pass_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
 		render_pass_info.renderPass = render_pass_;
@@ -374,16 +418,6 @@ namespace vkb::vk
 	{
 		vkCmdBindPipeline(command_buffers_[cur_frame_], VK_PIPELINE_BIND_POINT_GRAPHICS,
 		                  graphics_pipe_);
-
-		struct
-		{
-			alignas(16) mat4 view;
-			alignas(16) mat4 proj;
-		} ubo;
-
-		ubo.view = view_;
-		ubo.proj = proj_;
-		memcpy(uniform_buffers_map_[cur_frame_], &ubo, sizeof(ubo));
 
 		for (uint32_t i {0}; i < objs_.size(); ++i)
 			record_command_buffer(command_buffers_[cur_frame_], objs_[i]);
@@ -1562,9 +1596,9 @@ namespace vkb::vk
 		end_commands(cmd);
 	}
 
-	bool context::create_vertex_buffer(object* obj)
+	bool context::create_vertex_buffer(object* obj, mc::array_view<object::vert> verts)
 	{
-		uint64_t buf_size {sizeof(object::vert) * obj->verts.size()};
+		uint64_t buf_size {sizeof(object::vert) * verts.size()};
 
 		VkBuffer       staging_buf {nullptr};
 		VkDeviceMemory staging_buf_memory {nullptr};
@@ -1578,7 +1612,7 @@ namespace vkb::vk
 
 		void* buff_mem;
 		vkMapMemory(device_, staging_buf_memory, 0, buf_size, 0, &buff_mem);
-		memcpy(buff_mem, obj->verts.data(), buf_size);
+		memcpy(buff_mem, verts.data(), buf_size);
 		vkUnmapMemory(device_, staging_buf_memory);
 
 		res = create_buffer(buf_size,
@@ -1588,16 +1622,15 @@ namespace vkb::vk
 		                    obj->vertex_buffer_memory_);
 
 		copy_buffer(staging_buf, obj->vertex_buffer_, buf_size);
-
 		vkDestroyBuffer(device_, staging_buf, nullptr);
 		vkFreeMemory(device_, staging_buf_memory, nullptr);
 
 		return res;
 	}
 
-	bool context::create_index_buffer(object* obj)
+	bool context::create_index_buffer(object* obj, mc::array_view<uint16_t> idcs)
 	{
-		uint64_t buf_size {sizeof(uint16_t) * obj->idcs.size()};
+		uint64_t buf_size {sizeof(uint16_t) * idcs.size()};
 
 		VkBuffer       staging_buf {nullptr};
 		VkDeviceMemory staging_buf_memory {nullptr};
@@ -1611,7 +1644,7 @@ namespace vkb::vk
 
 		void* buff_mem;
 		vkMapMemory(device_, staging_buf_memory, 0, buf_size, 0, &buff_mem);
-		memcpy(buff_mem, obj->idcs.data(), buf_size);
+		memcpy(buff_mem, idcs.data(), buf_size);
 		vkUnmapMemory(device_, staging_buf_memory);
 
 		res = create_buffer(
@@ -1624,22 +1657,27 @@ namespace vkb::vk
 		vkDestroyBuffer(device_, staging_buf, nullptr);
 		vkFreeMemory(device_, staging_buf_memory, nullptr);
 
+		obj->idc_size = idcs.size();
+
 		return res;
 	}
 
 	bool context::create_uniform_buffers()
 	{
-		uint64_t buf_size = 3 * sizeof(mat4);
+		uint64_t buf_size = 2 * sizeof(mat4);
 
 		for (uint32_t i {0}; i < context::max_frames_in_flight; ++i)
 		{
-			create_buffer(buf_size, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+			create_buffer(buf_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
 			              VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
 			                  VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-			              uniform_buffers_[i], uniform_buffers_memory_[i]);
-
-			vkMapMemory(device_, uniform_buffers_memory_[i], 0, buf_size, 0,
-			            &uniform_buffers_map_[i]);
+			              staging_uniform_buffers_[i],
+			              staging_uniform_buffers_memory_[i]);
+			create_buffer(buf_size,
+			              VK_BUFFER_USAGE_TRANSFER_DST_BIT |
+			                  VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+			              VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, uniform_buffers_[i],
+			              uniform_buffers_memory_[i]);
 		}
 
 		return true;
@@ -1743,6 +1781,16 @@ namespace vkb::vk
 		copy.pRegions = &region;
 
 		vkCmdCopyBuffer2(cmd, &copy);
+
+		// VkBufferMemoryBarrier bar {};
+		// bar.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
+		// bar.buffer = dst;
+		// bar.size = size;
+		// bar.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+		// bar.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+		// vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TRANSFER_BIT,
+		//                      VK_PIPELINE_STAGE_VERTEX_SHADER_BIT, 0, 0, nullptr, 1,
+		//                      &bar, 0, nullptr);
 
 		end_commands(cmd);
 	}
@@ -1878,7 +1926,7 @@ namespace vkb::vk
 		vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe_layout_, 0, 1,
 		                        &obj->desc_sets_[cur_frame_], 0, nullptr);
 
-		vkCmdDrawIndexed(cmd, obj->idcs.size(), 1, 0, 0, 0);
+		vkCmdDrawIndexed(cmd, obj->idc_size, 1, 0, 0, 0);
 	}
 
 	void context::recreate_swapchain()

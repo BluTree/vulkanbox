@@ -35,7 +35,8 @@ namespace vkb::vk
 
 		bool created() const;
 
-		bool init_object(object* obj);
+		bool init_object(object* obj, mc::array_view<object::vert> verts,
+		                 mc::array_view<uint16_t> idcs);
 		void destroy_object(object* obj);
 
 		void begin_draw();
@@ -121,8 +122,8 @@ namespace vkb::vk
 		void copy_buffer_to_image(VkBuffer buffer, VkImage image, uint32_t w, uint32_t h);
 		void generate_mips(VkImage img, VkFormat format, uint32_t w, uint32_t h,
 		                   uint32_t mip_lvl);
-		bool create_vertex_buffer(object* obj);
-		bool create_index_buffer(object* obj);
+		bool create_vertex_buffer(object* obj, mc::array_view<object::vert> verts);
+		bool create_index_buffer(object* obj, mc::array_view<uint16_t> idcs);
 		bool create_uniform_buffers();
 		bool create_buffer(VkDeviceSize size, VkBufferUsageFlags usage,
 		                   VkMemoryPropertyFlags props, VkBuffer& buf,
@@ -182,9 +183,11 @@ namespace vkb::vk
 
 		VkDescriptorPool desc_pool_ {VK_NULL_HANDLE};
 
+		VkBuffer       staging_uniform_buffers_[context::max_frames_in_flight] {nullptr};
+		VkDeviceMemory staging_uniform_buffers_memory_[context::max_frames_in_flight] {
+			nullptr};
 		VkBuffer       uniform_buffers_[context::max_frames_in_flight] {nullptr};
 		VkDeviceMemory uniform_buffers_memory_[context::max_frames_in_flight] {nullptr};
-		void*          uniform_buffers_map_[context::max_frames_in_flight] {nullptr};
 
 		mat4 view_;
 		mat4 proj_;

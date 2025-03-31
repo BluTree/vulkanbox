@@ -57,6 +57,7 @@ if (mg.platform() == 'windows') then
 		)
 		platform_deps = {superluminal.project}
 		table.insert(platform_define, '-D"USE_SUPERLUMINAL"')
+		table.insert(platform_link_options, '-Xlinker /ignore:4099')
 	else
 		include_dirs = merge(
 			include_dirs,

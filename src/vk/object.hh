@@ -25,15 +25,12 @@ namespace vkb::vk
 			vec2 uv;
 		};
 
-		mc::vector<vert>     verts;
-		mc::vector<uint16_t> idcs;
-
 		vec4   pos {0.f, 0.f, 0.f, 1.f};
 		vec4   scale {1.f, 1.f, 1.f, 1.f};
 		mat4   model;
 		double rot {0.0};
 
-		uint32_t cur_frame_ {0};
+		uint32_t idc_size {0};
 
 		VkBuffer       vertex_buffer_ {nullptr};
 		VkDeviceMemory vertex_buffer_memory_ {nullptr};
