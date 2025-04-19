@@ -1,5 +1,6 @@
 #include "context.hh"
 
+#include "../input/input_system.hh"
 #include "../vk/context.hh"
 #include "../win/window.hh"
 
@@ -9,8 +10,9 @@
 
 namespace vkb::ui
 {
-	context::context(window& win, vk::context& vk)
+	context::context(window& win, input_system& is, vk::context& vk)
 	: win_ {win}
+	, is_ {is}
 	, vk_ {vk}
 	{
 		ImGui::CreateContext();
@@ -37,17 +39,19 @@ namespace vkb::ui
 		ImGui_ImplWin32_NewFrame();
 		ImGui::NewFrame();
 
-		if (ImGui::IsKeyPressed(ImGuiKey_Space))
+		if (is_.just_pressed(key::m2))
 			demo_ = !demo_;
 
 		if (demo_)
 			ImGui::ShowDemoWindow(&demo_);
 
 		refresh += dt;
-		if (refresh >= .2)
+		++fps;
+		if (refresh >= 1.0)
 		{
-			refresh -= .2;
-			fps = ImGui::GetIO().Framerate;
+			refresh -= 1.0;
+			disp_fps = fps;
+			fps = 0;
 		}
 
 		ImGui::SetNextWindowPos(ImVec2(ImGui::GetMainViewport()->WorkPos.x + 10,
@@ -63,7 +67,37 @@ namespace vkb::ui
 		if (ImGui::Begin("Overlay", nullptr, flags))
 		{
 			ImGuiIO& io = ImGui::GetIO();
-			ImGui::Text("%.2f (%.3f ms)", fps, io.DeltaTime * 1000.f);
+			ImGui::Text("%u (%.3f ms)", disp_fps, io.DeltaTime * 1000.f);
+			ImGui::End();
+		}
+
+		if (ImGui::Begin("Mouse"))
+		{
+			if (is_.pressed(key::m1))
+				ImGui::TextColored(ImVec4(0.f, 1.f, 0.f, 1.f), "M1");
+			else
+				ImGui::TextColored(ImVec4(1.f, 0.f, 0.f, 1.f), "M1");
+
+			if (is_.pressed(key::m2))
+				ImGui::TextColored(ImVec4(0.f, 1.f, 0.f, 1.f), "M2");
+			else
+				ImGui::TextColored(ImVec4(1.f, 0.f, 0.f, 1.f), "M2");
+
+			if (is_.pressed(key::m3))
+				ImGui::TextColored(ImVec4(0.f, 1.f, 0.f, 1.f), "M3");
+			else
+				ImGui::TextColored(ImVec4(1.f, 0.f, 0.f, 1.f), "M3");
+
+			if (is_.pressed(key::m4))
+				ImGui::TextColored(ImVec4(0.f, 1.f, 0.f, 1.f), "M4");
+			else
+				ImGui::TextColored(ImVec4(1.f, 0.f, 0.f, 1.f), "M4");
+
+			if (is_.pressed(key::m5))
+				ImGui::TextColored(ImVec4(0.f, 1.f, 0.f, 1.f), "M5");
+			else
+				ImGui::TextColored(ImVec4(1.f, 0.f, 0.f, 1.f), "M5");
+
 			ImGui::End();
 		}
 	}

@@ -1,4 +1,5 @@
 #include "core/time.hh"
+#include "input/input_system.hh"
 #include "ui/context.hh"
 #include "vk/context.hh"
 #include "win/window.hh"
@@ -13,9 +14,10 @@
 int main([[maybe_unused]] int argc, [[maybe_unused]] char** argv)
 {
 	using namespace vkb;
-	window      main_window;
-	vk::context ctx(main_window);
-	ui::context ui_ctx(main_window, ctx);
+	input_system is;
+	window       main_window(&is);
+	vk::context  ctx(main_window);
+	ui::context  ui_ctx(main_window, is, ctx);
 
 	bool running {ctx.created()};
 	// vkb::log::assert(running, "Failed to initialize Vulkan context");
@@ -48,6 +50,8 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char** argv)
 		time::stamp now = time::now();
 		double      dt = time::elapsed_sec(last, now);
 		last = now;
+
+		is.clear_transitions();
 		main_window.update();
 		ui_ctx.update(dt);
 

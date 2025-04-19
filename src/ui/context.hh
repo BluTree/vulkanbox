@@ -1,8 +1,11 @@
 #pragma once
 
+#include <stdint.h>
+
 namespace vkb
 {
 	class window;
+	class input_system;
 
 	namespace vk
 	{
@@ -15,19 +18,21 @@ namespace vkb::ui
 	class context
 	{
 	public:
-		context(window& win, vk::context& vk);
+		context(window& win, input_system& is, vk::context& vk);
 		~context();
 
 		void update(double dt);
 		void draw();
 
 	private:
-		window&      win_;
-		vk::context& vk_;
+		window&       win_;
+		input_system& is_;
+		vk::context&  vk_;
 
 		bool demo_ {false};
 
-		double refresh {0.0};
-		float  fps {0.f};
+		double   refresh {0.0};
+		uint32_t fps {0};
+		uint32_t disp_fps {0};
 	};
 }

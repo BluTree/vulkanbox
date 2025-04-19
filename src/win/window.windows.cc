@@ -1,5 +1,6 @@
 #include "window.hh"
 
+#include "../input/input_system.hh"
 #include "log.hh"
 
 #include <imgui/backends/imgui_impl_win32.h>
@@ -15,8 +16,9 @@ namespace vkb
 {
 	uint16_t window::class_id {0};
 
-	window::window()
+	window::window(input_system* is)
 	{
+		is_ = is;
 		HMODULE instance = GetModuleHandleW(nullptr);
 		if (!window::class_id)
 		{
@@ -143,6 +145,11 @@ namespace vkb
 					win->min_ = true;
 				else
 					win->min_ = false;
+				break;
+
+			case 0x00FF: // TODO WM_INPUT
+				if (win->is_)
+					win->is_->handle_event(w_param, l_param);
 				break;
 
 			default: break;

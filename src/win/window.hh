@@ -10,10 +10,15 @@
 
 namespace vkb
 {
+	class input_system;
+}
+
+namespace vkb
+{
 	class window
 	{
 	public:
-		window();
+		window(input_system* is = nullptr);
 		window(window const&) = delete;
 		window(window&&);
 		~window();
@@ -37,7 +42,8 @@ namespace vkb
 		static LRESULT wnd_proc(HWND hwnd, UINT msg, WPARAM w_param, LPARAM l_param);
 #endif
 
-		void* handle_;
+		void*         handle_;
+		input_system* is_;
 
 		bool closed_ {false};
 		bool min_ {false};
