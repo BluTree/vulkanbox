@@ -19,6 +19,11 @@ namespace vkb
 	{
 		class context;
 	}
+
+	namespace cam
+	{
+		class free;
+	}
 }
 
 struct ImGui_ImplVulkan_InitInfo;
@@ -39,7 +44,7 @@ namespace vkb::vk
 		                 mc::array_view<uint16_t> idcs);
 		void destroy_object(object* obj);
 
-		void begin_draw();
+		void begin_draw(cam::free& cam);
 		void draw();
 		void present();
 

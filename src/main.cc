@@ -1,3 +1,4 @@
+#include "cam/free.hh"
 #include "core/time.hh"
 #include "input/input_system.hh"
 #include "ui/context.hh"
@@ -17,7 +18,9 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char** argv)
 	input_system is;
 	window       main_window(&is);
 	vk::context  ctx(main_window);
-	ui::context  ui_ctx(main_window, is, ctx);
+
+	cam::free   cam(is, main_window);
+	ui::context ui_ctx(main_window, is, ctx, cam);
 
 	bool running {ctx.created()};
 	// vkb::log::assert(running, "Failed to initialize Vulkan context");
@@ -54,13 +57,14 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char** argv)
 		is.clear_transitions();
 		main_window.update();
 		ui_ctx.update(dt);
+		cam.update(dt);
 
 		for (uint32_t i {0}; i < objs.size(); i++)
 			objs[i].update(dt);
 
 		if (!main_window.closed() && !main_window.minimized())
 		{
-			ctx.begin_draw();
+			ctx.begin_draw(cam);
 			ctx.draw();
 			ui_ctx.draw();
 			ctx.present();

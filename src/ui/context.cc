@@ -1,8 +1,12 @@
 #include "context.hh"
 
+#include "../cam/free.hh"
 #include "../input/input_system.hh"
 #include "../vk/context.hh"
 #include "../win/window.hh"
+
+#include "../math/quat.hh"
+#include "../math/trig.hh"
 
 #include <imgui/backends/imgui_impl_vulkan.h>
 #include <imgui/backends/imgui_impl_win32.h>
@@ -10,10 +14,11 @@
 
 namespace vkb::ui
 {
-	context::context(window& win, input_system& is, vk::context& vk)
+	context::context(window& win, input_system& is, vk::context& vk, cam::free& cam)
 	: win_ {win}
 	, is_ {is}
 	, vk_ {vk}
+	, cam_ {cam}
 	{
 		ImGui::CreateContext();
 		ImGuiIO& io = ImGui::GetIO();
@@ -39,7 +44,7 @@ namespace vkb::ui
 		ImGui_ImplWin32_NewFrame();
 		ImGui::NewFrame();
 
-		if (is_.just_pressed(key::m2))
+		if (is_.just_pressed(key::backquote))
 			demo_ = !demo_;
 
 		if (demo_)
@@ -71,35 +76,61 @@ namespace vkb::ui
 			ImGui::End();
 		}
 
-		if (ImGui::Begin("Mouse"))
+		// TODO Better debug ui
+		/*if (ImGui::Begin("Mouse"))
 		{
-			if (is_.pressed(key::m1))
-				ImGui::TextColored(ImVec4(0.f, 1.f, 0.f, 1.f), "M1");
-			else
-				ImGui::TextColored(ImVec4(1.f, 0.f, 0.f, 1.f), "M1");
+		    if (is_.pressed(key::w))
+		        ImGui::TextColored(ImVec4(0.f, 1.f, 0.f, 1.f), "W");
+		    else
+		        ImGui::TextColored(ImVec4(1.f, 0.f, 0.f, 1.f), "W");
 
-			if (is_.pressed(key::m2))
-				ImGui::TextColored(ImVec4(0.f, 1.f, 0.f, 1.f), "M2");
-			else
-				ImGui::TextColored(ImVec4(1.f, 0.f, 0.f, 1.f), "M2");
+		    if (is_.pressed(key::s))
+		        ImGui::TextColored(ImVec4(0.f, 1.f, 0.f, 1.f), "S");
+		    else
+		        ImGui::TextColored(ImVec4(1.f, 0.f, 0.f, 1.f), "S");
 
-			if (is_.pressed(key::m3))
-				ImGui::TextColored(ImVec4(0.f, 1.f, 0.f, 1.f), "M3");
-			else
-				ImGui::TextColored(ImVec4(1.f, 0.f, 0.f, 1.f), "M3");
+		    if (is_.pressed(key::a))
+		        ImGui::TextColored(ImVec4(0.f, 1.f, 0.f, 1.f), "A");
+		    else
+		        ImGui::TextColored(ImVec4(1.f, 0.f, 0.f, 1.f), "A");
 
-			if (is_.pressed(key::m4))
-				ImGui::TextColored(ImVec4(0.f, 1.f, 0.f, 1.f), "M4");
-			else
-				ImGui::TextColored(ImVec4(1.f, 0.f, 0.f, 1.f), "M4");
+		    if (is_.pressed(key::d))
+		        ImGui::TextColored(ImVec4(0.f, 1.f, 0.f, 1.f), "D");
+		    else
+		        ImGui::TextColored(ImVec4(1.f, 0.f, 0.f, 1.f), "D");
 
-			if (is_.pressed(key::m5))
-				ImGui::TextColored(ImVec4(0.f, 1.f, 0.f, 1.f), "M5");
-			else
-				ImGui::TextColored(ImVec4(1.f, 0.f, 0.f, 1.f), "M5");
+		    if (is_.pressed(key::l_shift))
+		        ImGui::TextColored(ImVec4(0.f, 1.f, 0.f, 1.f), "LSHIFT");
+		    else
+		        ImGui::TextColored(ImVec4(1.f, 0.f, 0.f, 1.f), "LSHIFT");
 
-			ImGui::End();
+		    if (is_.pressed(key::l_ctrl))
+		        ImGui::TextColored(ImVec4(0.f, 1.f, 0.f, 1.f), "LCTRL");
+		    else
+		        ImGui::TextColored(ImVec4(1.f, 0.f, 0.f, 1.f), "LCTRL");
+
+		    ImGui::End();
 		}
+
+		if (ImGui::Begin("Cam"))
+		{
+		    ImGui::Text("Yaw: %.2f (rad: %.2f)", cam_.yaw_, rad(cam_.yaw_));
+		    ImGui::Text("Pitch: %.2f (rad: %.2f)", cam_.pitch_, rad(cam_.pitch_));
+		    ImGui::Text("Pos: %.2f %.2f %.2f", cam_.pos_.x, cam_.pos_.y, cam_.pos_.z);
+
+		    vec4 look = cam_.rot_.rotate(vec4(0.f, 1.f, 0.f, 1.f));
+		    ImGui::Text("Look: %.2f %.2f %.2f", look.x, look.y, look.z);
+		    ImGui::End();
+		}
+
+		if (ImGui::Begin("Window"))
+		{
+		    auto [pos_x, pos_y] = win_.position();
+
+		    ImGui::Text("Pos: %i %i", pos_x, pos_y);
+
+		    ImGui::End();
+		}*/
 	}
 
 	void context::draw()
@@ -109,5 +140,4 @@ namespace vkb::ui
 		ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(),
 		                                vk_.current_command_buffer());
 	}
-
 }

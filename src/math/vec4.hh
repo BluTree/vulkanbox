@@ -9,6 +9,7 @@ namespace vkb
 		vec4  operator+(float rhs) const;
 		vec4& operator+=(float rhs);
 
+		vec4  operator-() const;
 		vec4  operator-(vec4 rhs) const;
 		vec4& operator-=(vec4 rhs);
 		vec4  operator-(float rhs) const;

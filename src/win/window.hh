@@ -35,6 +35,12 @@ namespace vkb
 		mc::pair<uint32_t, uint32_t> size() const;
 		mc::pair<int32_t, int32_t>   position() const;
 
+		void lock_mouse() const;
+		void unlock_mouse() const;
+
+		void show_mouse() const;
+		void hide_mouse() const;
+
 	private:
 #ifdef VKB_WINDOWS
 		static uint16_t class_id;

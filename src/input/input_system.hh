@@ -32,9 +32,9 @@ namespace vkb
 		bool just_pressed(key k) const;
 		bool just_released(key k) const;
 
-		mc::pair<float, float>     wheel() const;
-		mc::pair<int32_t, int32_t> pos_abs() const;
-		mc::pair<int32_t, int32_t> pos_rel() const;
+		mc::pair<float, float>     mouse_wheel() const;
+		mc::pair<int32_t, int32_t> mouse_pos() const;
+		mc::pair<int32_t, int32_t> mouse_delta() const;
 
 	private:
 #ifdef VKB_WINDOWS

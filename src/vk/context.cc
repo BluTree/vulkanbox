@@ -1,4 +1,5 @@
 #include "context.hh"
+#include "../cam/free.hh"
 #include "../log.hh"
 #include "../math/trig.hh"
 #include "../win/window.hh"
@@ -332,7 +333,7 @@ namespace vkb::vk
 			vkDestroyBuffer(device_, obj->vertex_buffer_, nullptr);
 	}
 
-	void context::begin_draw()
+	void context::begin_draw(cam::free& cam)
 	{
 		vkWaitForFences(device_, 1, &in_flight_fences_[cur_frame_], VK_TRUE, UINT64_MAX);
 
@@ -364,7 +365,7 @@ namespace vkb::vk
 			alignas(16) mat4 proj;
 		} ubo;
 
-		ubo.view = view_;
+		ubo.view = cam.view_mat();
 		ubo.proj = proj_;
 
 		void* buff_mem;

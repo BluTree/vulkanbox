@@ -34,6 +34,11 @@ namespace vkb
 		return *this;
 	}
 
+	vec4 vec4::operator-() const
+	{
+		return {-x, -y, -z, -w};
+	}
+
 	vec4 vec4::operator-(vec4 rhs) const
 	{
 		return {x - rhs.x, y - rhs.y, z - rhs.z, w - rhs.w};

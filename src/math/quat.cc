@@ -34,6 +34,16 @@ namespace vkb
 		};
 	}
 
+	quat quat::operator*(quat quat)
+	{
+		return {
+			w * quat.w - x * quat.x - y * quat.y - z * quat.z,
+			w * quat.x + x * quat.w - y * quat.z + z * quat.y,
+			w * quat.y + x * quat.z + y * quat.w - z * quat.x,
+			w * quat.z - x * quat.y + y * quat.x + z * quat.w,
+		};
+	}
+
 	vec4 quat::rotate(vec4 vec)
 	{
 		vec4 qvec {x, y, z, 0};

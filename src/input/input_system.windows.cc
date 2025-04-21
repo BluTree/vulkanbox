@@ -157,7 +157,7 @@ namespace vkb
 	void input_system::clear_transitions()
 	{
 		for (mc::underlying_type<key> i {0}; i < mc::to_underlying(key::max_enum); ++i)
-			key_states_[i / 8] &= ~(1 << (i % 8 + 1));
+			key_states_[i * 2 / 8] &= ~(1 << (i * 2 % 8 + 1));
 
 		wheel_ = {0.f, 0.f};
 		pos_rel_ = {0, 0};
@@ -191,17 +191,17 @@ namespace vkb
 		         (1 << ((mc::to_underlying(k) * 2 + 1) % 8))) != 0);
 	}
 
-	mc::pair<float, float> input_system::wheel() const
+	mc::pair<float, float> input_system::mouse_wheel() const
 	{
 		return wheel_;
 	}
 
-	mc::pair<int32_t, int32_t> input_system::pos_abs() const
+	mc::pair<int32_t, int32_t> input_system::mouse_pos() const
 	{
 		return pos_abs_;
 	}
 
-	mc::pair<int32_t, int32_t> input_system::pos_rel() const
+	mc::pair<int32_t, int32_t> input_system::mouse_delta() const
 	{
 		return pos_rel_;
 	}
@@ -258,7 +258,7 @@ namespace vkb
 				pos_abs_.first = data->data.mouse.lLastX;
 				pos_abs_.second = data->data.mouse.lLastY;
 			}
-			else if (data->data.mouse.usFlags & MOUSE_MOVE_RELATIVE)
+			else /* MOUSE_MOVE_RELATIVE */
 			{
 				pos_rel_.first = data->data.mouse.lLastX;
 				pos_rel_.second = data->data.mouse.lLastY;
@@ -283,7 +283,7 @@ namespace vkb
 				key_states_[mc::to_underlying(key::m1) * 2 / 8] |=
 					(1 << (mc::to_underlying(key::m1) * 2 % 8));
 
-				if (last_pressed)
+				if (!last_pressed)
 					key_states_[mc::to_underlying(key::m1) * 2 / 8] |=
 						(1 << (mc::to_underlying(key::m1) * 2 % 8 + 1));
 			}
@@ -295,7 +295,7 @@ namespace vkb
 				key_states_[mc::to_underlying(key::m1) * 2 / 8] &=
 					~(1 << (mc::to_underlying(key::m1) * 2 % 8));
 
-				if (!last_pressed)
+				if (last_pressed)
 					key_states_[mc::to_underlying(key::m1) * 2 / 8] |=
 						(1 << (mc::to_underlying(key::m1) * 2 % 8 + 1));
 			}
@@ -308,7 +308,7 @@ namespace vkb
 				key_states_[mc::to_underlying(key::m2) * 2 / 8] |=
 					(1 << (mc::to_underlying(key::m2) * 2 % 8));
 
-				if (last_pressed)
+				if (!last_pressed)
 					key_states_[mc::to_underlying(key::m2) * 2 / 8] |=
 						(1 << (mc::to_underlying(key::m2) * 2 % 8 + 1));
 			}
@@ -320,7 +320,7 @@ namespace vkb
 				key_states_[mc::to_underlying(key::m2) * 2 / 8] &=
 					~(1 << (mc::to_underlying(key::m2) * 2 % 8));
 
-				if (!last_pressed)
+				if (last_pressed)
 					key_states_[mc::to_underlying(key::m2) * 2 / 8] |=
 						(1 << (mc::to_underlying(key::m2) * 2 % 8 + 1));
 			}
@@ -333,7 +333,7 @@ namespace vkb
 				key_states_[mc::to_underlying(key::m3) * 2 / 8] |=
 					(1 << (mc::to_underlying(key::m3) * 2 % 8));
 
-				if (last_pressed)
+				if (!last_pressed)
 					key_states_[mc::to_underlying(key::m3) * 2 / 8] |=
 						(1 << (mc::to_underlying(key::m3) * 2 % 8 + 1));
 			}
@@ -345,7 +345,7 @@ namespace vkb
 				key_states_[mc::to_underlying(key::m3) * 2 / 8] &=
 					~(1 << (mc::to_underlying(key::m3) * 2 % 8));
 
-				if (!last_pressed)
+				if (last_pressed)
 					key_states_[mc::to_underlying(key::m3) * 2 / 8] |=
 						(1 << (mc::to_underlying(key::m3) * 2 % 8 + 1));
 			}
@@ -358,7 +358,7 @@ namespace vkb
 				key_states_[mc::to_underlying(key::m4) * 2 / 8] |=
 					(1 << (mc::to_underlying(key::m4) * 2 % 8));
 
-				if (last_pressed)
+				if (!last_pressed)
 					key_states_[mc::to_underlying(key::m4) * 2 / 8] |=
 						(1 << (mc::to_underlying(key::m4) * 2 % 8 + 1));
 			}
@@ -370,7 +370,7 @@ namespace vkb
 				key_states_[mc::to_underlying(key::m4) * 2 / 8] &=
 					~(1 << (mc::to_underlying(key::m4) * 2 % 8));
 
-				if (!last_pressed)
+				if (last_pressed)
 					key_states_[mc::to_underlying(key::m4) * 2 / 8] |=
 						(1 << (mc::to_underlying(key::m4) * 2 % 8 + 1));
 			}
@@ -383,7 +383,7 @@ namespace vkb
 				key_states_[mc::to_underlying(key::m5) * 2 / 8] |=
 					(1 << (mc::to_underlying(key::m5) * 2 % 8));
 
-				if (last_pressed)
+				if (!last_pressed)
 					key_states_[mc::to_underlying(key::m5) * 2 / 8] |=
 						(1 << (mc::to_underlying(key::m5) * 2 % 8 + 1));
 			}
@@ -395,7 +395,7 @@ namespace vkb
 				key_states_[mc::to_underlying(key::m5) * 2 / 8] &=
 					~(1 << (mc::to_underlying(key::m5) * 2 % 8));
 
-				if (!last_pressed)
+				if (last_pressed)
 					key_states_[mc::to_underlying(key::m5) * 2 / 8] |=
 						(1 << (mc::to_underlying(key::m5) * 2 % 8 + 1));
 			}

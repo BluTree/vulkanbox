@@ -109,15 +109,39 @@ namespace vkb
 	{
 		RECT rect;
 		GetClientRect(handle_, &rect);
-		return {static_cast<uint32_t>(rect.right - rect.left),
-		        static_cast<uint32_t>(rect.bottom - rect.top)};
+		return {static_cast<uint32_t>(rect.right), static_cast<uint32_t>(rect.bottom)};
 	}
 
 	mc::pair<int32_t, int32_t> window::position() const
 	{
 		RECT rect;
-		GetClientRect(handle_, &rect);
+		GetWindowRect(handle_, &rect);
 		return {rect.left, rect.top};
+	}
+
+	void window::lock_mouse() const
+	{
+		RECT rect;
+		GetWindowRect(handle_, &rect);
+
+		rect.top = rect.bottom = rect.top + (rect.bottom - rect.top) / 2;
+		rect.left = rect.right = rect.left + (rect.right - rect.left) / 2;
+		ClipCursor(&rect);
+	}
+
+	void window::unlock_mouse() const
+	{
+		ClipCursor(nullptr);
+	}
+
+	void window::show_mouse() const
+	{
+		ShowCursor(true);
+	}
+
+	void window::hide_mouse() const
+	{
+		ShowCursor(false);
 	}
 
 	LRESULT window::wnd_proc(HWND hwnd, UINT msg, WPARAM w_param, LPARAM l_param)

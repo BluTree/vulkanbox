@@ -11,6 +11,11 @@ namespace vkb
 	{
 		class context;
 	}
+
+	namespace cam
+	{
+		class free;
+	}
 }
 
 namespace vkb::ui
@@ -18,7 +23,7 @@ namespace vkb::ui
 	class context
 	{
 	public:
-		context(window& win, input_system& is, vk::context& vk);
+		context(window& win, input_system& is, vk::context& vk, cam::free& cam);
 		~context();
 
 		void update(double dt);
@@ -28,6 +33,7 @@ namespace vkb::ui
 		window&       win_;
 		input_system& is_;
 		vk::context&  vk_;
+		cam::free&    cam_;
 
 		bool demo_ {false};
 
