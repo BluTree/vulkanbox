@@ -26,7 +26,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char** argv)
 	// vkb::log::assert(running, "Failed to initialize Vulkan context");
 	time::stamp last = time::now();
 
-	mc::vector<vk::object::vert> verts {
+	vk::object::vert verts[] {
 		{{-1.0f, -1.0f, 0.0f, 1.0f},  {1.0f, 0.0f, 0.0f, 1.0f}, {1.0f, 0.0f}},
 		{{1.0f, -1.0f, 0.0f, 1.0f},   {0.0f, 0.0f, 1.0f, 1.0f}, {0.0f, 0.0f}},
 		{{1.0f, 1.0f, 0.0f, 1.0f},    {0.0f, 1.0f, 0.0f, 1.0f}, {0.0f, 1.0f}},
@@ -36,7 +36,8 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char** argv)
 		{{1.0f, 1.0f, -1.0f, 1.0f},   {0.0f, 1.0f, 0.0f, 1.0f}, {0.0f, 1.0f}},
 		{{-1.0f, 1.0f, -1.0f, 1.0f},  {1.0f, 1.0f, 1.0f, 1.0f}, {1.0f, 1.0f}}
     };
-	mc::vector<uint16_t>   idcs {0, 1, 2, 0, 2, 3, 4, 5, 6, 4, 6, 7};
+	uint16_t idcs[] {0, 1, 2, 0, 2, 3, 4, 5, 6, 4, 6, 7};
+
 	mc::vector<vk::object> objs(2);
 	objs[0].model = mat4::rotate({0.f, 0.f, 1.f, 1.f}, rad(45));
 	objs[1].pos = {0.f, 2.f, .5f, 1.f};

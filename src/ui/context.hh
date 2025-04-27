@@ -30,10 +30,10 @@ namespace vkb::ui
 		void draw();
 
 	private:
-		window&       win_;
-		input_system& is_;
-		vk::context&  vk_;
-		cam::free&    cam_;
+		[[maybe_unused]] window&       win_;
+		[[maybe_unused]] input_system& is_;
+		[[maybe_unused]] vk::context&  vk_;
+		[[maybe_unused]] cam::free&    cam_;
 
 		bool demo_ {false};
 
