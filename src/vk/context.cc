@@ -52,7 +52,7 @@ namespace vkb::vk
 	: win_ {win}
 	{
 		auto [w, h] = win_.size();
-		proj_ = mat4::persp_proj(0.1f, 10.f, w / (float)h, rad(70));
+		proj_ = mat4::persp_proj(0.1f, 100.f, w / (float)h, rad(70));
 		view_ = mat4::look_at({0.f, -2.f, 2.f, 1.f}, vec4(), {0.f, 0.f, 1.f, 1.f});
 
 		created_ = create_instance();
@@ -1836,8 +1836,8 @@ namespace vkb::vk
 	{
 		VkDescriptorPoolSize pool_sizes[] = {
 			{VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-		     context::max_frames_in_flight + 1                                            },
-			{VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,         context::max_frames_in_flight * 10}
+		     context::max_frames_in_flight + 1											  },
+			{VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,         context::max_frames_in_flight * 1000}
         };
 		VkDescriptorPoolCreateInfo pool_info {};
 		pool_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
@@ -1956,7 +1956,7 @@ namespace vkb::vk
 		res &= create_framebuffers();
 
 		auto [w, h] = win_.size();
-		proj_ = mat4::persp_proj(0.1f, 10.f, w / (float)h, rad(70));
+		proj_ = mat4::persp_proj(0.1f, 100.f, w / (float)h, rad(70));
 		if (!res)
 			log::error("Cannot recreate swapchain");
 	}

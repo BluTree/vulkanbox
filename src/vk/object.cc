@@ -42,8 +42,7 @@ namespace vkb::vk
 
 	void object::update(double dt)
 	{
-		rot = fmod(rot + dt, M_PI * 2.0);
-		model = mat4::translate(pos) * mat4::rotate(vec4 {0.f, 0.f, 1.f, 1.f}, rot) *
-		        mat4::scale(scale);
+		rot = fmod(rot + (dt * rot_speed), M_PI * 2.0);
+		model = mat4::translate(pos) * mat4::rotate(rot_axis, rot) * mat4::scale(scale);
 	}
 }

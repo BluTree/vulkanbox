@@ -48,12 +48,13 @@ namespace vkb::cam
 		if (is_.pressed(key::d))
 			vel.x = +dt * 5;
 
+		float vel_modifier = 1.f;
 		if (is_.pressed(key::l_shift))
-			pos_.z += dt * 5;
+			vel_modifier = 2.f;
 		if (is_.pressed(key::l_ctrl))
-			pos_.z -= dt * 5;
+			vel_modifier = 0.5f;
 
-		pos_ += rot_.rotate(vel);
+		pos_ += rot_.rotate(vel * vel_modifier);
 	}
 
 	mat4 free::view_mat()

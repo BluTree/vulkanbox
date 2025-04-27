@@ -28,7 +28,9 @@ namespace vkb::vk
 		vec4   pos {0.f, 0.f, 0.f, 1.f};
 		vec4   scale {1.f, 1.f, 1.f, 1.f};
 		mat4   model;
+		vec4   rot_axis {0.f, 0.f, 1.f, 1.f};
 		double rot {0.0};
+		float  rot_speed {1.0f};
 
 		uint32_t idc_size {0};
 
