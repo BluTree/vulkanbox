@@ -9,6 +9,5 @@
 	"files.associations": {
 		"*.sln": "xml",
 		"log": "log",
-		"ios": "cpp"
 	}
 }

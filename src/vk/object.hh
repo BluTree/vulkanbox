@@ -7,6 +7,7 @@
 #include <array.hh>
 #include <vector.hh>
 
+#include "vma/vma.hh"
 #include <vulkan/vulkan.h>
 
 namespace vkb::vk
@@ -34,18 +35,18 @@ namespace vkb::vk
 
 		uint32_t idc_size {0};
 
-		VkBuffer       vertex_buffer_ {nullptr};
-		VkDeviceMemory vertex_buffer_memory_ {nullptr};
-		VkBuffer       index_buffer_ {nullptr};
-		VkDeviceMemory index_buffer_memory_ {nullptr};
+		VkBuffer      vertex_buffer_ {nullptr};
+		VmaAllocation vertex_buffer_memory_ {nullptr};
+		VkBuffer      index_buffer_ {nullptr};
+		VmaAllocation index_buffer_memory_ {nullptr};
 
 		VkDescriptorSet desc_sets_[2] {nullptr};
 
-		uint32_t       mip_lvl_;
-		VkImage        tex_img_ {nullptr};
-		VkDeviceMemory tex_img_buf_ {nullptr};
-		VkImageView    tex_img_view_ {nullptr};
-		VkSampler      tex_sampler_ {nullptr};
+		uint32_t      mip_lvl_;
+		VkImage       tex_img_ {nullptr};
+		VmaAllocation tex_img_buf_ {nullptr};
+		VkImageView   tex_img_view_ {nullptr};
+		VkSampler     tex_sampler_ {nullptr};
 	};
 
 }

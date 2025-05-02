@@ -71,15 +71,15 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char** argv)
 	};
 
 	mc::vector<vk::object> objs;
-	objs.reserve(1000);
+	objs.reserve(10000);
 
 	srand(0);
 
 	for (uint32_t i {0}; i < objs.capacity(); i++)
 	{
 		vk::object& obj = objs.emplace_back();
-		obj.pos = {static_cast<float>(rand() % 50), static_cast<float>(rand() % 50),
-		           static_cast<float>(rand() % 50), 1.0f};
+		obj.pos = {static_cast<float>(rand() % 100), static_cast<float>(rand() % 100),
+		           static_cast<float>(rand() % 100), 1.0f};
 		obj.rot_axis =
 			vkb::vec4(static_cast<float>(rand() % 100), static_cast<float>(rand() % 100),
 		              static_cast<float>(rand() % 100), 1.0f)

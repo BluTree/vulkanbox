@@ -90,6 +90,13 @@ namespace vkb::vk
 			return;
 		}
 
+		created_ = create_allocator();
+		if (!created_)
+		{
+			log::error("Failed to create allocator");
+			return;
+		}
+
 		created_ = create_swapchain();
 		if (!created_)
 		{
@@ -182,7 +189,7 @@ namespace vkb::vk
 		if (depth_img_view_)
 			vkDestroyImageView(device_, depth_img_view_, nullptr);
 		if (depth_img_buf_)
-			vkFreeMemory(device_, depth_img_buf_, nullptr);
+			vmaFreeMemory(allocator_, depth_img_buf_);
 		if (depth_img_)
 			vkDestroyImage(device_, depth_img_, nullptr);
 
@@ -200,14 +207,14 @@ namespace vkb::vk
 
 			if (uniform_buffers_[i])
 			{
-				vkDestroyBuffer(device_, uniform_buffers_[i], nullptr);
-				vkFreeMemory(device_, uniform_buffers_memory_[i], nullptr);
+				vmaDestroyBuffer(allocator_, uniform_buffers_[i],
+				                 uniform_buffers_memory_[i]);
 			}
 
 			if (staging_uniform_buffers_[i])
 			{
-				vkDestroyBuffer(device_, staging_uniform_buffers_[i], nullptr);
-				vkFreeMemory(device_, staging_uniform_buffers_memory_[i], nullptr);
+				vmaDestroyBuffer(allocator_, staging_uniform_buffers_[i],
+				                 staging_uniform_buffers_memory_[i]);
 			}
 		}
 
@@ -232,6 +239,9 @@ namespace vkb::vk
 
 		if (swapchain_)
 			vkDestroySwapchainKHR(device_, swapchain_, nullptr);
+
+		if (allocator_)
+			vmaDestroyAllocator(allocator_);
 
 		if (device_)
 			vkDestroyDevice(device_, nullptr);
@@ -312,7 +322,7 @@ namespace vkb::vk
 		if (obj->tex_img_view_)
 			vkDestroyImageView(device_, obj->tex_img_view_, nullptr);
 		if (obj->tex_img_buf_)
-			vkFreeMemory(device_, obj->tex_img_buf_, nullptr);
+			vmaFreeMemory(allocator_, obj->tex_img_buf_);
 		if (obj->tex_img_)
 			vkDestroyImage(device_, obj->tex_img_, nullptr);
 
@@ -320,17 +330,11 @@ namespace vkb::vk
 		{
 		}
 
-		if (obj->index_buffer_memory_)
-			vkFreeMemory(device_, obj->index_buffer_memory_, nullptr);
-
 		if (obj->index_buffer_)
-			vkDestroyBuffer(device_, obj->index_buffer_, nullptr);
-
-		if (obj->vertex_buffer_memory_)
-			vkFreeMemory(device_, obj->vertex_buffer_memory_, nullptr);
+			vmaDestroyBuffer(allocator_, obj->index_buffer_, obj->index_buffer_memory_);
 
 		if (obj->vertex_buffer_)
-			vkDestroyBuffer(device_, obj->vertex_buffer_, nullptr);
+			vmaDestroyBuffer(allocator_, obj->vertex_buffer_, obj->vertex_buffer_memory_);
 	}
 
 	void context::begin_draw(cam::free& cam)
@@ -369,10 +373,9 @@ namespace vkb::vk
 		ubo.proj = proj_;
 
 		void* buff_mem;
-		vkMapMemory(device_, staging_uniform_buffers_memory_[cur_frame_], 0, sizeof(ubo),
-		            0, &buff_mem);
+		vmaMapMemory(allocator_, staging_uniform_buffers_memory_[cur_frame_], &buff_mem);
 		memcpy(buff_mem, &ubo, sizeof(ubo));
-		vkUnmapMemory(device_, staging_uniform_buffers_memory_[cur_frame_]);
+		vmaUnmapMemory(allocator_, staging_uniform_buffers_memory_[cur_frame_]);
 
 		VkBufferCopy2 region {};
 		region.sType = VK_STRUCTURE_TYPE_BUFFER_COPY_2;
@@ -563,12 +566,12 @@ namespace vkb::vk
 		create_info.ppEnabledExtensionNames = required_exts;
 		create_info.enabledExtensionCount = 3;
 
-		char const* layers[] {"VK_LAYER_KHRONOS_validation"};
-		if (!check_validation_layers(layers))
-			return false;
+		// char const* layers[] {"VK_LAYER_KHRONOS_validation"};
+		// if (!check_validation_layers(layers))
+		// 	return false;
 
-		create_info.enabledLayerCount = 1;
-		create_info.ppEnabledLayerNames = layers;
+		create_info.enabledLayerCount = 0;
+		create_info.ppEnabledLayerNames = nullptr;
 
 		uint32_t ext_cnt {0};
 		vkEnumerateInstanceExtensionProperties(nullptr, &ext_cnt, nullptr);
@@ -775,6 +778,7 @@ namespace vkb::vk
 
 	bool context::create_logical_device()
 	{
+		[[maybe_unused]] mc::vector<int>    test {0, 1, 2, 3};
 		mc::vector<VkDeviceQueueCreateInfo> queues;
 		float                               priority {1.f};
 		// Graphics Queue
@@ -814,6 +818,20 @@ namespace vkb::vk
 
 		vkGetDeviceQueue(device_, queue_families_.graphics, 0, &graphics_queue_);
 		vkGetDeviceQueue(device_, queue_families_.present, 0, &present_queue_);
+		return res == VK_SUCCESS;
+	}
+
+	bool context::create_allocator()
+	{
+		VmaAllocatorCreateInfo create_info {};
+		create_info.physicalDevice = phys_device_;
+		create_info.device = device_;
+		create_info.instance = inst_;
+		create_info.vulkanApiVersion = VK_API_VERSION_1_4;
+		// TODO explore allocator flags
+
+		VkResult res = vmaCreateAllocator(&create_info, &allocator_);
+
 		return res == VK_SUCCESS;
 	}
 
@@ -1328,17 +1346,17 @@ namespace vkb::vk
 		obj->mip_lvl_ = floor(log2(w > h ? w : h));
 		uint64_t size = w * h * 4;
 
-		VkBuffer       staging_buf;
-		VkDeviceMemory staging_buf_mem;
+		VkBuffer      staging_buf;
+		VmaAllocation staging_buf_mem;
 		create_buffer(size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
 		              VK_MEMORY_PROPERTY_HOST_COHERENT_BIT |
 		                  VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT,
 		              staging_buf, staging_buf_mem);
 
 		void* data;
-		vkMapMemory(device_, staging_buf_mem, 0, size, 0, &data);
+		vmaMapMemory(allocator_, staging_buf_mem, &data);
 		memcpy(data, pix, size);
-		vkUnmapMemory(device_, staging_buf_mem);
+		vmaUnmapMemory(allocator_, staging_buf_mem);
 
 		stbi_image_free(pix);
 
@@ -1358,8 +1376,7 @@ namespace vkb::vk
 		//                         obj->mip_lvl_);
 		generate_mips(obj->tex_img_, VK_FORMAT_R8G8B8A8_SRGB, w, h, obj->mip_lvl_);
 
-		vkDestroyBuffer(device_, staging_buf, nullptr);
-		vkFreeMemory(device_, staging_buf_mem, nullptr);
+		vmaDestroyBuffer(allocator_, staging_buf, staging_buf_mem);
 
 		return true;
 	}
@@ -1402,8 +1419,8 @@ namespace vkb::vk
 
 	bool context::create_image(uint32_t w, uint32_t h, uint32_t mip_lvl, VkFormat format,
 	                           VkImageTiling tiling, VkImageUsageFlags usage,
-	                           VkMemoryPropertyFlags props, VkImage& image,
-	                           VkDeviceMemory& mem)
+	                           [[maybe_unused]] VkMemoryPropertyFlags props,
+	                           VkImage& image, VmaAllocation& mem)
 	{
 		VkImageCreateInfo img_info {};
 		img_info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
@@ -1421,21 +1438,12 @@ namespace vkb::vk
 		img_info.samples = VK_SAMPLE_COUNT_1_BIT;
 		img_info.mipLevels = mip_lvl;
 
-		VkResult res = vkCreateImage(device_, &img_info, nullptr, &image);
-		if (res != VK_SUCCESS)
-			return false;
+		VmaAllocationCreateInfo alloc_info {};
+		alloc_info.memoryTypeBits = find_mem_type_idx(props);
 
-		VkMemoryRequirements mem_req;
-		vkGetImageMemoryRequirements(device_, image, &mem_req);
-
-		VkMemoryAllocateInfo alloc_info {};
-		alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-		alloc_info.allocationSize = mem_req.size;
-		alloc_info.memoryTypeIndex = find_mem_type_idx(mem_req.memoryTypeBits, props);
-
-		res = vkAllocateMemory(device_, &alloc_info, nullptr, &mem);
-
-		vkBindImageMemory(device_, image, mem, 0);
+		// VkResult res = vkCreateImage(device_, &img_info, nullptr, &image);
+		VkResult res = vmaCreateImage(reinterpret_cast<VmaAllocator>(allocator_),
+		                              &img_info, &alloc_info, &image, &mem, nullptr);
 		return res == VK_SUCCESS;
 	}
 
@@ -1601,8 +1609,8 @@ namespace vkb::vk
 	{
 		uint64_t buf_size {sizeof(object::vert) * verts.size()};
 
-		VkBuffer       staging_buf {nullptr};
-		VkDeviceMemory staging_buf_memory {nullptr};
+		VkBuffer      staging_buf {nullptr};
+		VmaAllocation staging_buf_memory {nullptr};
 
 		bool res = create_buffer(buf_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
 		                         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
@@ -1612,9 +1620,9 @@ namespace vkb::vk
 			return false;
 
 		void* buff_mem;
-		vkMapMemory(device_, staging_buf_memory, 0, buf_size, 0, &buff_mem);
+		vmaMapMemory(allocator_, staging_buf_memory, &buff_mem);
 		memcpy(buff_mem, verts.data(), buf_size);
-		vkUnmapMemory(device_, staging_buf_memory);
+		vmaUnmapMemory(allocator_, staging_buf_memory);
 
 		res = create_buffer(buf_size,
 		                    VK_BUFFER_USAGE_TRANSFER_DST_BIT |
@@ -1623,8 +1631,7 @@ namespace vkb::vk
 		                    obj->vertex_buffer_memory_);
 
 		copy_buffer(staging_buf, obj->vertex_buffer_, buf_size);
-		vkDestroyBuffer(device_, staging_buf, nullptr);
-		vkFreeMemory(device_, staging_buf_memory, nullptr);
+		vmaDestroyBuffer(allocator_, staging_buf, staging_buf_memory);
 
 		return res;
 	}
@@ -1633,8 +1640,8 @@ namespace vkb::vk
 	{
 		uint64_t buf_size {sizeof(uint16_t) * idcs.size()};
 
-		VkBuffer       staging_buf {nullptr};
-		VkDeviceMemory staging_buf_memory {nullptr};
+		VkBuffer      staging_buf {nullptr};
+		VmaAllocation staging_buf_memory {nullptr};
 
 		bool res = create_buffer(buf_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
 		                         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
@@ -1644,9 +1651,9 @@ namespace vkb::vk
 			return false;
 
 		void* buff_mem;
-		vkMapMemory(device_, staging_buf_memory, 0, buf_size, 0, &buff_mem);
+		vmaMapMemory(allocator_, staging_buf_memory, &buff_mem);
 		memcpy(buff_mem, idcs.data(), buf_size);
-		vkUnmapMemory(device_, staging_buf_memory);
+		vmaUnmapMemory(allocator_, staging_buf_memory);
 
 		res = create_buffer(
 			buf_size, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
@@ -1655,8 +1662,7 @@ namespace vkb::vk
 
 		copy_buffer(staging_buf, obj->index_buffer_, buf_size);
 
-		vkDestroyBuffer(device_, staging_buf, nullptr);
-		vkFreeMemory(device_, staging_buf_memory, nullptr);
+		vmaDestroyBuffer(allocator_, staging_buf, staging_buf_memory);
 
 		obj->idc_size = idcs.size();
 
@@ -1685,8 +1691,8 @@ namespace vkb::vk
 	}
 
 	bool context::create_buffer(VkDeviceSize size, VkBufferUsageFlags usage,
-	                            VkMemoryPropertyFlags props, VkBuffer& buf,
-	                            VkDeviceMemory& buf_mem)
+	                            [[maybe_unused]] VkMemoryPropertyFlags props,
+	                            VkBuffer& buf, VmaAllocation& buf_mem)
 	{
 		VkBufferCreateInfo create_info {};
 		create_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
@@ -1694,40 +1700,22 @@ namespace vkb::vk
 		create_info.usage = usage;
 		create_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
-		VkResult res = vkCreateBuffer(device_, &create_info, nullptr, &buf);
-		if (res != VK_SUCCESS)
-			return false;
-
-		VkMemoryRequirements mem_req {};
-		vkGetBufferMemoryRequirements(device_, buf, &mem_req);
-
-		uint32_t mem_type_idx {find_mem_type_idx(mem_req.memoryTypeBits, props)};
-		if (mem_type_idx == UINT32_MAX)
-			return false;
-
-		VkMemoryAllocateInfo alloc_info {};
-		alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-		alloc_info.allocationSize = mem_req.size;
-		alloc_info.memoryTypeIndex = mem_type_idx;
-
-		res = vkAllocateMemory(device_, &alloc_info, nullptr, &buf_mem);
-		vkBindBufferMemory(device_, buf, buf_mem, 0);
+		VmaAllocationCreateInfo alloc_info {};
+		alloc_info.memoryTypeBits = find_mem_type_idx(props);
+		VkResult res =
+			vmaCreateBuffer(reinterpret_cast<VmaAllocator>(allocator_), &create_info,
+		                    &alloc_info, &buf, &buf_mem, nullptr);
 
 		return res == VK_SUCCESS;
 	}
 
-	uint32_t context::find_mem_type_idx(uint32_t mem_prop, VkMemoryPropertyFlags props)
+	uint32_t context::find_mem_type_idx(VkMemoryPropertyFlags props)
 	{
-		VkPhysicalDeviceMemoryProperties mem_props {};
-		vkGetPhysicalDeviceMemoryProperties(phys_device_, &mem_props);
-		for (uint32_t i {0}; i < mem_props.memoryTypeCount; ++i)
-		{
-			if ((mem_prop & (1 << i)) &&
-			    ((mem_props.memoryTypes[i].propertyFlags & props) == props))
-			{
-				return i;
-			}
-		}
+		VkPhysicalDeviceMemoryProperties const* mem_props;
+		vmaGetMemoryProperties(allocator_, &mem_props);
+		for (uint32_t i {0}; i < mem_props->memoryTypeCount; ++i)
+			if ((mem_props->memoryTypes[i].propertyFlags & props) == props)
+				return 1 << i;
 
 		return UINT32_MAX;
 	}
@@ -1836,8 +1824,8 @@ namespace vkb::vk
 	{
 		VkDescriptorPoolSize pool_sizes[] = {
 			{VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-		     context::max_frames_in_flight + 1											  },
-			{VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,         context::max_frames_in_flight * 1000}
+		     context::max_frames_in_flight + 1											   },
+			{VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,         context::max_frames_in_flight * 10000}
         };
 		VkDescriptorPoolCreateInfo pool_info {};
 		pool_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
@@ -1859,14 +1847,14 @@ namespace vkb::vk
 		VkDescriptorSetAllocateInfo alloc_info {};
 		alloc_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
 		alloc_info.descriptorPool = desc_pool_;
-		alloc_info.descriptorSetCount = context::max_frames_in_flight;
+		alloc_info.descriptorSetCount = 1;
 		alloc_info.pSetLayouts = layouts;
 
 		VkResult res = vkAllocateDescriptorSets(device_, &alloc_info, obj->desc_sets_);
 		if (res != VK_SUCCESS)
 			return false;
 
-		for (uint32_t i {0}; i < context::max_frames_in_flight; ++i)
+		for (uint32_t i {0}; i < 1; ++i)
 		{
 			VkDescriptorBufferInfo buf_info {};
 			buf_info.buffer = uniform_buffers_[i];
@@ -1925,7 +1913,7 @@ namespace vkb::vk
 		vkCmdBindVertexBuffers(cmd, 0, 1, buffs, offsets);
 		vkCmdBindIndexBuffer(cmd, obj->index_buffer_, 0, VK_INDEX_TYPE_UINT16);
 		vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe_layout_, 0, 1,
-		                        &obj->desc_sets_[cur_frame_], 0, nullptr);
+		                        &obj->desc_sets_[0], 0, nullptr);
 
 		vkCmdDrawIndexed(cmd, obj->idc_size, 1, 0, 0, 0);
 	}
@@ -1936,10 +1924,8 @@ namespace vkb::vk
 
 		if (depth_img_view_)
 			vkDestroyImageView(device_, depth_img_view_, nullptr);
-		if (depth_img_buf_)
-			vkFreeMemory(device_, depth_img_buf_, nullptr);
 		if (depth_img_)
-			vkDestroyImage(device_, depth_img_, nullptr);
+			vmaDestroyImage(allocator_, depth_img_, depth_img_buf_);
 
 		for (uint32_t i {0}; i < framebuffers_.size(); ++i)
 			vkDestroyFramebuffer(device_, framebuffers_[i], nullptr);

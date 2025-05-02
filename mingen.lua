@@ -8,20 +8,24 @@ vulkan = require('deps/vulkan')
 imgui = require('deps/imgui')
 mincore = require('deps/mincore')
 stb = require('deps/stb')
+vma = require('deps/vma')
 
 include_dirs = merge(
 	{mg.get_build_dir() .. 'deps/', 'src/'},
 	imgui.includes,
 	vulkan.includes,
-	mincore.includes
+	mincore.includes,
 	-- stb.includes
+	vma.includes
 )
 
 platform_define = {}
 if (mg.platform() == 'windows') then
 	platform_define = {
 		'-D"VKB_WINDOWS"',
-		'-D"_CRT_SECURE_NO_WARNINGS"'
+		'-D"_CRT_SECURE_NO_WARNINGS"',
+		'-D"_MT"',
+		'-D"_DLL"',
 	}
 elseif (mg.platform() == 'linux') then
 	platform_define = {'-D"VKB_LINUX"'}

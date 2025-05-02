@@ -7,6 +7,7 @@
 #include <string_view.hh>
 #include <vector.hh>
 
+#include "vma/vma.hh"
 #include <vulkan/vulkan.h>
 
 #include <stdint.h>
@@ -91,6 +92,8 @@ namespace vkb::vk
 
 		bool create_logical_device();
 
+		bool create_allocator();
+
 		VkSurfaceFormatKHR choose_swap_format();
 		VkPresentModeKHR   choose_swap_present_mode();
 		VkExtent2D         choose_swap_extent();
@@ -120,7 +123,7 @@ namespace vkb::vk
 		bool create_image(uint32_t w, uint32_t h, uint32_t mip_lvl, VkFormat format,
 		                  VkImageTiling tiling, VkImageUsageFlags usage,
 		                  VkMemoryPropertyFlags props, VkImage& image,
-		                  VkDeviceMemory& mem);
+		                  VmaAllocation& mem);
 		void transition_image_layout(VkImage image, VkFormat format,
 		                             VkImageLayout old_layout, VkImageLayout new_layout,
 		                             uint32_t mip_lvl);
@@ -132,8 +135,8 @@ namespace vkb::vk
 		bool create_uniform_buffers();
 		bool create_buffer(VkDeviceSize size, VkBufferUsageFlags usage,
 		                   VkMemoryPropertyFlags props, VkBuffer& buf,
-		                   VkDeviceMemory& buf_mem);
-		uint32_t        find_mem_type_idx(uint32_t mem_prop, VkMemoryPropertyFlags props);
+		                   VmaAllocation& buf_mem);
+		uint32_t        find_mem_type_idx(VkMemoryPropertyFlags props);
 		VkCommandBuffer begin_commands();
 		void            end_commands(VkCommandBuffer cmd);
 		void            copy_buffer(VkBuffer src, VkBuffer dst, uint64_t size);
@@ -160,6 +163,9 @@ namespace vkb::vk
 		queue_families    queue_families_;
 		swapchain_support swapchain_support_;
 		VkDevice          device_ {nullptr};
+
+		// Should be VmaAllocator* but void* to prevent vma inclusion in header
+		VmaAllocator allocator_ {nullptr};
 
 		VkQueue graphics_queue_ {nullptr};
 		VkQueue present_queue_ {nullptr};
@@ -188,20 +194,20 @@ namespace vkb::vk
 
 		VkDescriptorPool desc_pool_ {VK_NULL_HANDLE};
 
-		VkBuffer       staging_uniform_buffers_[context::max_frames_in_flight] {nullptr};
-		VkDeviceMemory staging_uniform_buffers_memory_[context::max_frames_in_flight] {
+		VkBuffer      staging_uniform_buffers_[context::max_frames_in_flight] {nullptr};
+		VmaAllocation staging_uniform_buffers_memory_[context::max_frames_in_flight] {
 			nullptr};
-		VkBuffer       uniform_buffers_[context::max_frames_in_flight] {nullptr};
-		VkDeviceMemory uniform_buffers_memory_[context::max_frames_in_flight] {nullptr};
+		VkBuffer      uniform_buffers_[context::max_frames_in_flight] {nullptr};
+		VmaAllocation uniform_buffers_memory_[context::max_frames_in_flight] {nullptr};
 
 		mat4 view_;
 		mat4 proj_;
 
 		mc::vector<object*> objs_;
 
-		VkFormat       depth_fmt_;
-		VkImage        depth_img_ {nullptr};
-		VkDeviceMemory depth_img_buf_ {nullptr};
-		VkImageView    depth_img_view_ {nullptr};
+		VkFormat      depth_fmt_;
+		VkImage       depth_img_ {nullptr};
+		VmaAllocation depth_img_buf_ {nullptr};
+		VkImageView   depth_img_view_ {nullptr};
 	};
 }
