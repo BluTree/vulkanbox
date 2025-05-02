@@ -2,6 +2,7 @@
 
 #include <stdint.h>
 
+#include <enum.hh>
 #include <pair.hh>
 
 #include "keys.hh"
@@ -40,7 +41,7 @@ namespace vkb
 #ifdef VKB_WINDOWS
 		void handle_event(uint64_t w_param, uint64_t l_param);
 
-		uint8_t*                   key_states_;
+		uint8_t key_states_[(mc::to_underlying(key::max_enum) * 2) / 8 + 1];
 		mc::pair<float, float>     wheel_ {0.f, 0.f};
 		mc::pair<int32_t, int32_t> pos_abs_ {0, 0};
 		mc::pair<int32_t, int32_t> pos_rel_ {0, 0};

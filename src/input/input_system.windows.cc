@@ -4,7 +4,6 @@
 #include "keys.hh"
 
 #include <array.hh>
-#include <enum.hh>
 
 #include <string.h>
 #include <win32/misc.h>
@@ -144,15 +143,10 @@ namespace vkb
 		log::assert(RegisterRawInputDevices(inputs, 2, sizeof(RAWINPUTDEVICE)) != 0,
 		            "Cannot initialize Raw Input: Error %lu", GetLastError());
 
-		// TODO Check max length for each range, no one seem to go as far as 0xFF
-		key_states_ = new uint8_t[(mc::to_underlying(key::max_enum) * 2) / 8];
 		memset(key_states_, 0, (mc::to_underlying(key::max_enum) * 2) / 8);
 	}
 
-	input_system::~input_system()
-	{
-		delete[] key_states_;
-	}
+	input_system::~input_system() {}
 
 	void input_system::clear_transitions()
 	{
