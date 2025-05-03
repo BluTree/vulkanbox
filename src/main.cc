@@ -29,7 +29,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char** argv)
 	// vkb::log::assert(running, "Failed to initialize Vulkan context");
 	time::stamp last = time::now();
 
-	vk::object::vert verts[] {
+	vk::model::vert verts[] {
 		// upper face
 		{{-1.0f, 1.0f, 1.0f, 1.0f},   {1.0f, 1.0f, 1.0f, 1.0f}, {0.0f, 0.0f}},
 		{{1.0f, 1.0f, 1.0f, 1.0f},    {0.0f, 1.0f, 0.0f, 1.0f}, {1.0f, 0.0f}},
@@ -75,6 +75,11 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char** argv)
 
 	srand(0);
 
+	vk::model   model;
+	vk::texture tex;
+	ctx.init_model(model, verts, idcs);
+	ctx.init_texture(tex, "res/textures/tex.png");
+
 	for (uint32_t i {0}; i < objs.capacity(); i++)
 	{
 		vk::object& obj = objs.emplace_back();
@@ -86,7 +91,10 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char** argv)
 				.norm3();
 		obj.scale = {.5f, .5f, .5f, 1.f};
 		obj.rot_speed = static_cast<float>(rand() % 100) / 50.f;
-		ctx.init_object(&obj, verts, idcs);
+
+		obj.model = &model;
+		obj.tex = &tex;
+		ctx.init_object(&obj);
 	}
 
 	while (running)
@@ -122,6 +130,9 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char** argv)
 	}
 
 	ctx.wait_completion();
+
+	ctx.destroy_texture(tex);
+	ctx.destroy_model(model);
 
 	for (uint32_t i {0}; i < objs.size(); i++)
 		ctx.destroy_object(&objs[i]);

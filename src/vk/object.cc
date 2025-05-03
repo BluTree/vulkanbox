@@ -8,41 +8,9 @@
 
 namespace vkb::vk
 {
-	VkVertexInputBindingDescription object::binding_desc()
-	{
-		VkVertexInputBindingDescription res {};
-		res.binding = 0;
-		res.stride = sizeof(vert);
-		res.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
-
-		return res;
-	}
-
-	mc::array<VkVertexInputAttributeDescription, 3> object::attribute_descs()
-	{
-		mc::array<VkVertexInputAttributeDescription, 3> res {};
-
-		res[0].binding = 0;
-		res[0].location = 0;
-		res[0].format = VK_FORMAT_R32G32B32A32_SFLOAT;
-		res[0].offset = offsetof(vert, pos);
-
-		res[1].binding = 0;
-		res[1].location = 1;
-		res[1].format = VK_FORMAT_R32G32B32A32_SFLOAT;
-		res[1].offset = offsetof(vert, col);
-
-		res[2].binding = 0;
-		res[2].location = 2;
-		res[2].format = VK_FORMAT_R32G32_SFLOAT;
-		res[2].offset = offsetof(vert, uv);
-
-		return res;
-	}
-
 	void object::update(double dt)
 	{
 		rot = fmod(rot + (dt * rot_speed), M_PI * 2.0);
-		model = mat4::translate(pos) * mat4::rotate(rot_axis, rot) * mat4::scale(scale);
+		trs = mat4::translate(pos) * mat4::rotate(rot_axis, rot) * mat4::scale(scale);
 	}
 }

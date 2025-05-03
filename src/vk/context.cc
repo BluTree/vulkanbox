@@ -264,45 +264,77 @@ namespace vkb::vk
 		return created_;
 	}
 
-	bool context::init_object(object* obj, mc::array_view<object::vert> verts,
-	                          mc::array_view<uint16_t> idcs)
+	bool context::init_model(model& model, mc::array_view<model::vert> verts,
+	                         mc::array_view<uint16_t> idcs)
 	{
-		bool init = create_texture_image(obj);
-		if (!init)
-		{
-			log::error("Failed to create texture image");
-			return init;
-		}
-
-		init = create_texture_image_view(obj);
-		if (!init)
-		{
-			log::error("Failed to create texture image view");
-			return init;
-		}
-
-		init = create_texture_sampler(obj);
-		if (!init)
-		{
-			log::error("Failed to create texture sampler");
-			return init;
-		}
-
-		init = create_vertex_buffer(obj, verts);
+		bool init = create_vertex_buffer(model, verts);
 		if (!init)
 		{
 			log::error("Failed to create vertex buffer");
 			return init;
 		}
 
-		init = create_index_buffer(obj, idcs);
+		init = create_index_buffer(model, idcs);
 		if (!init)
 		{
 			log::error("Failed to create index buffer");
 			return init;
 		}
 
-		init = create_descriptor_sets(obj);
+		return init;
+	}
+
+	void context::destroy_model(model& model)
+	{
+		if (model.index_buffer_)
+			vmaDestroyBuffer(allocator_, model.index_buffer_, model.index_buffer_memory_);
+
+		if (model.vertex_buffer_)
+			vmaDestroyBuffer(allocator_, model.vertex_buffer_,
+			                 model.vertex_buffer_memory_);
+	}
+
+	bool context::init_texture(texture& tex, mc::string_view path)
+	{
+		bool init = create_texture_image(tex, path);
+		if (!init)
+		{
+			log::error("Failed to create texture image");
+			return init;
+		}
+
+		init = create_texture_image_view(tex);
+		if (!init)
+		{
+			log::error("Failed to create texture image view");
+			return init;
+		}
+
+		init = create_texture_sampler(tex);
+		if (!init)
+		{
+			log::error("Failed to create texture sampler");
+			return init;
+		}
+
+		return init;
+	}
+
+	void context::destroy_texture(texture& tex)
+	{
+		if (tex.sampler)
+			vkDestroySampler(device_, tex.sampler, nullptr);
+		if (tex.img_view)
+			vkDestroyImageView(device_, tex.img_view, nullptr);
+		if (tex.img_memory)
+			vmaFreeMemory(allocator_, tex.img_memory);
+		if (tex.img)
+			vkDestroyImage(device_, tex.img, nullptr);
+	}
+
+	bool context::init_object(object* obj)
+	{
+		bool init = create_descriptor_sets(obj);
 		if (!init)
 		{
 			log::error("Failed to create descriptor sets");
@@ -317,24 +349,7 @@ namespace vkb::vk
 
 	void context::destroy_object(object* obj)
 	{
-		if (obj->tex_sampler_)
-			vkDestroySampler(device_, obj->tex_sampler_, nullptr);
-		if (obj->tex_img_view_)
-			vkDestroyImageView(device_, obj->tex_img_view_, nullptr);
-		if (obj->tex_img_buf_)
-			vmaFreeMemory(allocator_, obj->tex_img_buf_);
-		if (obj->tex_img_)
-			vkDestroyImage(device_, obj->tex_img_, nullptr);
-
-		for (uint32_t i {0}; i < context::max_frames_in_flight; ++i)
-		{
-		}
-
-		if (obj->index_buffer_)
-			vmaDestroyBuffer(allocator_, obj->index_buffer_, obj->index_buffer_memory_);
-
-		if (obj->vertex_buffer_)
-			vmaDestroyBuffer(allocator_, obj->vertex_buffer_, obj->vertex_buffer_memory_);
+		vkFreeDescriptorSets(device_, desc_pool_, 2, obj->desc_sets_);
 	}
 
 	void context::begin_draw(cam::free& cam)
@@ -1117,9 +1132,9 @@ namespace vkb::vk
 		VkPipelineShaderStageCreateInfo shader_stages[] {vert_create_info,
 		                                                 frag_create_info};
 
-		VkVertexInputBindingDescription binding_desc = object::binding_desc();
+		VkVertexInputBindingDescription binding_desc = model::binding_desc();
 		mc::array<VkVertexInputAttributeDescription, 3> attribute_descs =
-			object::attribute_descs();
+			model::attribute_descs();
 
 		VkPipelineVertexInputStateCreateInfo vert_input_info {};
 		vert_input_info.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
@@ -1336,14 +1351,14 @@ namespace vkb::vk
 		return VK_FORMAT_UNDEFINED;
 	}
 
-	bool context::create_texture_image(object* obj)
+	bool context::create_texture_image(texture& tex, mc::string_view path)
 	{
 		int32_t  w, h, c;
-		uint8_t* pix = stbi_load("res/textures/tex.png", &w, &h, &c, STBI_rgb_alpha);
+		uint8_t* pix = stbi_load(path.data(), &w, &h, &c, STBI_rgb_alpha);
 		if (!pix)
 			return false;
 
-		obj->mip_lvl_ = floor(log2(w > h ? w : h));
+		tex.mip_lvl = floor(log2(w > h ? w : h));
 		uint64_t size = w * h * 4;
 
 		VkBuffer      staging_buf;
@@ -1360,35 +1375,33 @@ namespace vkb::vk
 
 		stbi_image_free(pix);
 
-		create_image(
-			w, h, obj->mip_lvl_, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_TILING_OPTIMAL,
-			VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT |
-				VK_IMAGE_USAGE_SAMPLED_BIT,
-			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, obj->tex_img_, obj->tex_img_buf_);
+		create_image(w, h, tex.mip_lvl, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_TILING_OPTIMAL,
+		             VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT |
+		                 VK_IMAGE_USAGE_SAMPLED_BIT,
+		             VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, tex.img, tex.img_memory);
 
-		transition_image_layout(obj->tex_img_, VK_FORMAT_R8G8B8A8_SRGB,
+		transition_image_layout(tex.img, VK_FORMAT_R8G8B8A8_SRGB,
 		                        VK_IMAGE_LAYOUT_UNDEFINED,
-		                        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, obj->mip_lvl_);
-		copy_buffer_to_image(staging_buf, obj->tex_img_, w, h);
+		                        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, tex.mip_lvl);
+		copy_buffer_to_image(staging_buf, tex.img, w, h);
 		// transition_image_layout(tex_img_, VK_FORMAT_R8G8B8A8_SRGB,
 		//                         VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
 		//                         VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
 		//                         obj->mip_lvl_);
-		generate_mips(obj->tex_img_, VK_FORMAT_R8G8B8A8_SRGB, w, h, obj->mip_lvl_);
+		generate_mips(tex.img, VK_FORMAT_R8G8B8A8_SRGB, w, h, tex.mip_lvl);
 
 		vmaDestroyBuffer(allocator_, staging_buf, staging_buf_mem);
 
 		return true;
 	}
 
-	bool context::create_texture_image_view(object* obj)
+	bool context::create_texture_image_view(texture& tex)
 	{
-		return create_image_view(obj->tex_img_, VK_FORMAT_R8G8B8A8_SRGB,
-		                         VK_IMAGE_ASPECT_COLOR_BIT, obj->mip_lvl_,
-		                         obj->tex_img_view_);
+		return create_image_view(tex.img, VK_FORMAT_R8G8B8A8_SRGB,
+		                         VK_IMAGE_ASPECT_COLOR_BIT, tex.mip_lvl, tex.img_view);
 	}
 
-	bool context::create_texture_sampler(object* obj)
+	bool context::create_texture_sampler(texture& tex)
 	{
 		VkSamplerCreateInfo sampler {};
 		sampler.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
@@ -1399,7 +1412,7 @@ namespace vkb::vk
 		sampler.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
 		sampler.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
 		sampler.minLod = 0.f;
-		sampler.maxLod = obj->mip_lvl_;
+		sampler.maxLod = tex.mip_lvl;
 		sampler.mipLodBias = 0.f;
 
 		VkPhysicalDeviceProperties props {};
@@ -1413,7 +1426,7 @@ namespace vkb::vk
 		sampler.compareOp = VK_COMPARE_OP_ALWAYS;
 		sampler.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
 
-		VkResult res = vkCreateSampler(device_, &sampler, nullptr, &obj->tex_sampler_);
+		VkResult res = vkCreateSampler(device_, &sampler, nullptr, &tex.sampler);
 		return res == VK_SUCCESS;
 	}
 
@@ -1605,9 +1618,9 @@ namespace vkb::vk
 		end_commands(cmd);
 	}
 
-	bool context::create_vertex_buffer(object* obj, mc::array_view<object::vert> verts)
+	bool context::create_vertex_buffer(model& model, mc::array_view<model::vert> verts)
 	{
-		uint64_t buf_size {sizeof(object::vert) * verts.size()};
+		uint64_t buf_size {sizeof(model::vert) * verts.size()};
 
 		VkBuffer      staging_buf {nullptr};
 		VmaAllocation staging_buf_memory {nullptr};
@@ -1627,16 +1640,16 @@ namespace vkb::vk
 		res = create_buffer(buf_size,
 		                    VK_BUFFER_USAGE_TRANSFER_DST_BIT |
 		                        VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-		                    VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, obj->vertex_buffer_,
-		                    obj->vertex_buffer_memory_);
+		                    VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, model.vertex_buffer_,
+		                    model.vertex_buffer_memory_);
 
-		copy_buffer(staging_buf, obj->vertex_buffer_, buf_size);
+		copy_buffer(staging_buf, model.vertex_buffer_, buf_size);
 		vmaDestroyBuffer(allocator_, staging_buf, staging_buf_memory);
 
 		return res;
 	}
 
-	bool context::create_index_buffer(object* obj, mc::array_view<uint16_t> idcs)
+	bool context::create_index_buffer(model& model, mc::array_view<uint16_t> idcs)
 	{
 		uint64_t buf_size {sizeof(uint16_t) * idcs.size()};
 
@@ -1657,14 +1670,14 @@ namespace vkb::vk
 
 		res = create_buffer(
 			buf_size, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
-			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, obj->index_buffer_,
-			obj->index_buffer_memory_);
+			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, model.index_buffer_,
+			model.index_buffer_memory_);
 
-		copy_buffer(staging_buf, obj->index_buffer_, buf_size);
+		copy_buffer(staging_buf, model.index_buffer_, buf_size);
 
 		vmaDestroyBuffer(allocator_, staging_buf, staging_buf_memory);
 
-		obj->idc_size = idcs.size();
+		model.idc_size = idcs.size();
 
 		return res;
 	}
@@ -1863,8 +1876,8 @@ namespace vkb::vk
 
 			VkDescriptorImageInfo img_info {};
 			img_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-			img_info.imageView = obj->tex_img_view_;
-			img_info.sampler = obj->tex_sampler_;
+			img_info.imageView = obj->tex->img_view;
+			img_info.sampler = obj->tex->sampler;
 
 			VkWriteDescriptorSet write[2];
 			memset(write, 0, 2 * sizeof(VkWriteDescriptorSet));
@@ -1893,7 +1906,7 @@ namespace vkb::vk
 	void context::record_command_buffer(VkCommandBuffer cmd, object* obj)
 	{
 		vkCmdPushConstants(cmd, pipe_layout_, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(mat4),
-		                   &obj->model);
+		                   &obj->trs);
 		VkViewport viewport {};
 		viewport.x = 0.0f;
 		viewport.y = 0.0f;
@@ -1908,14 +1921,14 @@ namespace vkb::vk
 		scissor.extent = swapchain_extent_;
 		vkCmdSetScissor(cmd, 0, 1, &scissor);
 
-		VkBuffer     buffs[] {obj->vertex_buffer_};
+		VkBuffer     buffs[] {obj->model->vertex_buffer_};
 		VkDeviceSize offsets[] {0};
 		vkCmdBindVertexBuffers(cmd, 0, 1, buffs, offsets);
-		vkCmdBindIndexBuffer(cmd, obj->index_buffer_, 0, VK_INDEX_TYPE_UINT16);
+		vkCmdBindIndexBuffer(cmd, obj->model->index_buffer_, 0, VK_INDEX_TYPE_UINT16);
 		vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe_layout_, 0, 1,
 		                        &obj->desc_sets_[0], 0, nullptr);
 
-		vkCmdDrawIndexed(cmd, obj->idc_size, 1, 0, 0, 0);
+		vkCmdDrawIndexed(cmd, obj->model->idc_size, 1, 0, 0, 0);
 	}
 
 	void context::recreate_swapchain()

@@ -41,8 +41,14 @@ namespace vkb::vk
 
 		bool created() const;
 
-		bool init_object(object* obj, mc::array_view<object::vert> verts,
-		                 mc::array_view<uint16_t> idcs);
+		bool init_model(model& model, mc::array_view<model::vert> verts,
+		                mc::array_view<uint16_t> idcs);
+		void destroy_model(model& model);
+
+		bool init_texture(texture& tex, mc::string_view path);
+		void destroy_texture(texture& tex);
+
+		bool init_object(object* obj);
 		void destroy_object(object* obj);
 
 		void begin_draw(cam::free& cam);
@@ -117,9 +123,9 @@ namespace vkb::vk
 		VkFormat find_supported_format(mc::array_view<VkFormat> formats,
 		                               VkImageTiling tiling, VkFormatFeatureFlags feats);
 
-		bool create_texture_image(object* obj);
-		bool create_texture_image_view(object* obj);
-		bool create_texture_sampler(object* obj);
+		bool create_texture_image(texture& tex, mc::string_view path);
+		bool create_texture_image_view(texture& tex);
+		bool create_texture_sampler(texture& tex);
 		bool create_image(uint32_t w, uint32_t h, uint32_t mip_lvl, VkFormat format,
 		                  VkImageTiling tiling, VkImageUsageFlags usage,
 		                  VkMemoryPropertyFlags props, VkImage& image,
@@ -130,8 +136,8 @@ namespace vkb::vk
 		void copy_buffer_to_image(VkBuffer buffer, VkImage image, uint32_t w, uint32_t h);
 		void generate_mips(VkImage img, VkFormat format, uint32_t w, uint32_t h,
 		                   uint32_t mip_lvl);
-		bool create_vertex_buffer(object* obj, mc::array_view<object::vert> verts);
-		bool create_index_buffer(object* obj, mc::array_view<uint16_t> idcs);
+		bool create_vertex_buffer(model& model, mc::array_view<model::vert> verts);
+		bool create_index_buffer(model& model, mc::array_view<uint16_t> idcs);
 		bool create_uniform_buffers();
 		bool create_buffer(VkDeviceSize size, VkBufferUsageFlags usage,
 		                   VkMemoryPropertyFlags props, VkBuffer& buf,
