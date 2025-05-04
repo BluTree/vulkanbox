@@ -254,19 +254,19 @@ namespace vkb
 			}
 			else /* MOUSE_MOVE_RELATIVE */
 			{
-				pos_rel_.first = data->data.mouse.lLastX;
-				pos_rel_.second = data->data.mouse.lLastY;
+				pos_rel_.first += data->data.mouse.lLastX;
+				pos_rel_.second += data->data.mouse.lLastY;
 			}
 
 			if ((data->data.mouse.usButtonFlags & RI_MOUSE_WHEEL) != 0)
 			{
-				wheel_.first = static_cast<int16_t>(data->data.mouse.usButtonData) /
-				               static_cast<float>(WHEEL_DELTA);
+				wheel_.first += static_cast<int16_t>(data->data.mouse.usButtonData) /
+				                static_cast<float>(WHEEL_DELTA);
 			}
 			else if ((data->data.mouse.usButtonFlags & RI_MOUSE_HWHEEL) != 0)
 			{
-				wheel_.second = static_cast<int16_t>(data->data.mouse.usButtonData) /
-				                static_cast<float>(WHEEL_DELTA);
+				wheel_.second += static_cast<int16_t>(data->data.mouse.usButtonData) /
+				                 static_cast<float>(WHEEL_DELTA);
 			}
 
 			if ((data->data.mouse.usButtonFlags & RI_MOUSE_BUTTON_1_DOWN) != 0)
