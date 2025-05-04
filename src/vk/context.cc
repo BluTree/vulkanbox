@@ -52,7 +52,7 @@ namespace vkb::vk
 	: win_ {win}
 	{
 		auto [w, h] = win_.size();
-		proj_ = mat4::persp_proj(0.1f, 100.f, w / (float)h, rad(70));
+		proj_ = mat4::persp_proj(near_, far_, w / (float)h, rad(fov_deg_));
 		view_ = mat4::look_at({0.f, -2.f, 2.f, 1.f}, vec4(), {0.f, 0.f, 1.f, 1.f});
 
 		created_ = create_instance();
@@ -264,6 +264,16 @@ namespace vkb::vk
 		return created_;
 	}
 
+	void context::set_proj(float near, float far, float fov_deg)
+	{
+		near_ = near;
+		far_ = far;
+		fov_deg_ = fov_deg;
+
+		auto [w, h] = win_.size();
+		proj_ = mat4::persp_proj(near_, far_, w / (float)h, rad(fov_deg_));
+	}
+
 	bool context::init_model(model& model, mc::array_view<model::vert> verts,
 	                         mc::array_view<uint16_t> idcs)
 	{
@@ -384,8 +394,8 @@ namespace vkb::vk
 			alignas(16) mat4 proj;
 		} ubo;
 
-		ubo.view = cam.view_mat();
-		ubo.proj = proj_;
+		ubo.view = cam.view_mat().transpose();
+		ubo.proj = proj_.transpose();
 
 		void* buff_mem;
 		vmaMapMemory(allocator_, staging_uniform_buffers_memory_[cur_frame_], &buff_mem);
@@ -585,8 +595,8 @@ namespace vkb::vk
 		// if (!check_validation_layers(layers))
 		// 	return false;
 
-		create_info.enabledLayerCount = 0;
-		create_info.ppEnabledLayerNames = nullptr;
+		// create_info.enabledLayerCount = 1;
+		// create_info.ppEnabledLayerNames = layers;
 
 		uint32_t ext_cnt {0};
 		vkEnumerateInstanceExtensionProperties(nullptr, &ext_cnt, nullptr);
@@ -1860,14 +1870,14 @@ namespace vkb::vk
 		VkDescriptorSetAllocateInfo alloc_info {};
 		alloc_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
 		alloc_info.descriptorPool = desc_pool_;
-		alloc_info.descriptorSetCount = 1;
+		alloc_info.descriptorSetCount = context::max_frames_in_flight;
 		alloc_info.pSetLayouts = layouts;
 
 		VkResult res = vkAllocateDescriptorSets(device_, &alloc_info, obj->desc_sets_);
 		if (res != VK_SUCCESS)
 			return false;
 
-		for (uint32_t i {0}; i < 1; ++i)
+		for (uint32_t i {0}; i < context::max_frames_in_flight; ++i)
 		{
 			VkDescriptorBufferInfo buf_info {};
 			buf_info.buffer = uniform_buffers_[i];
@@ -1905,8 +1915,9 @@ namespace vkb::vk
 
 	void context::record_command_buffer(VkCommandBuffer cmd, object* obj)
 	{
+		mat4 trs = obj->trs.transpose();
 		vkCmdPushConstants(cmd, pipe_layout_, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(mat4),
-		                   &obj->trs);
+		                   &trs);
 		VkViewport viewport {};
 		viewport.x = 0.0f;
 		viewport.y = 0.0f;
@@ -1926,7 +1937,7 @@ namespace vkb::vk
 		vkCmdBindVertexBuffers(cmd, 0, 1, buffs, offsets);
 		vkCmdBindIndexBuffer(cmd, obj->model->index_buffer_, 0, VK_INDEX_TYPE_UINT16);
 		vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe_layout_, 0, 1,
-		                        &obj->desc_sets_[0], 0, nullptr);
+		                        &obj->desc_sets_[cur_frame_], 0, nullptr);
 
 		vkCmdDrawIndexed(cmd, obj->model->idc_size, 1, 0, 0, 0);
 	}
@@ -1955,7 +1966,7 @@ namespace vkb::vk
 		res &= create_framebuffers();
 
 		auto [w, h] = win_.size();
-		proj_ = mat4::persp_proj(0.1f, 100.f, w / (float)h, rad(70));
+		proj_ = mat4::persp_proj(near_, far_, w / (float)h, rad(fov_deg_));
 		if (!res)
 			log::error("Cannot recreate swapchain");
 	}

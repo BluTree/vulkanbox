@@ -37,15 +37,15 @@ namespace vkb
 		mat4 res {mat4::identity};
 
 		res[0][0] = axis.x * axis.x * inv_cos + a_cos;
-		res[1][0] = axis.x * axis.y * inv_cos + axis.z * a_sin;
-		res[2][0] = axis.x * axis.z * inv_cos - axis.y * a_sin;
+		res[0][1] = axis.x * axis.y * inv_cos + axis.z * a_sin;
+		res[0][2] = axis.x * axis.z * inv_cos - axis.y * a_sin;
 
-		res[0][1] = axis.y * axis.x * inv_cos - axis.z * a_sin;
+		res[1][0] = axis.y * axis.x * inv_cos - axis.z * a_sin;
 		res[1][1] = axis.y * axis.y * inv_cos + a_cos;
-		res[2][1] = axis.y * axis.z * inv_cos + axis.x * a_sin;
+		res[1][2] = axis.y * axis.z * inv_cos + axis.x * a_sin;
 
-		res[0][2] = axis.z * axis.x * inv_cos + axis.y * a_sin;
-		res[1][2] = axis.z * axis.y * inv_cos - axis.x * a_sin;
+		res[2][0] = axis.z * axis.x * inv_cos + axis.y * a_sin;
+		res[2][1] = axis.z * axis.y * inv_cos - axis.x * a_sin;
 		res[2][2] = axis.z * axis.z * inv_cos + a_cos;
 
 		return res;
@@ -137,14 +137,12 @@ namespace vkb
 
 	mat4::mat4(float arr[16])
 	{
-		for (uint32_t i {0}; i < 16; ++i)
-			arr_[i % 4][i / 4] = arr[i];
+		memcpy(arr_, arr, 16 * sizeof(float));
 	}
 
 	mat4::mat4(std::initializer_list<float> arr)
 	{
-		for (uint32_t i {0}; i < 16; ++i)
-			arr_[i % 4][i / 4] = arr.begin()[i];
+		memcpy(arr_, arr.begin(), 16 * sizeof(float));
 	}
 
 	float* mat4::operator[](uint8_t i) &
@@ -165,12 +163,24 @@ namespace vkb
 		{
 			for (uint32_t j {0}; j < 4; ++j)
 			{
-				float val {0};
-				for (uint32_t k {0}; k < 4; ++k)
-					val += (*this)[k][j] * other[i][k];
-				res[i][j] = val;
+				res[i][j] += (*this)[i][0] * other[0][j];
+				res[i][j] += (*this)[i][1] * other[1][j];
+				res[i][j] += (*this)[i][2] * other[2][j];
+				res[i][j] += (*this)[i][3] * other[3][j];
 			}
 		}
 		return res;
+	}
+
+	mat4 mat4::transpose() const
+	{
+		mat4 res;
+
+		return {
+			(*this)[0][0], (*this)[1][0], (*this)[2][0], (*this)[3][0],
+			(*this)[0][1], (*this)[1][1], (*this)[2][1], (*this)[3][1],
+			(*this)[0][2], (*this)[1][2], (*this)[2][2], (*this)[3][2],
+			(*this)[0][3], (*this)[1][3], (*this)[2][3], (*this)[3][3],
+		};
 	}
 }

@@ -29,9 +29,9 @@ namespace vkb::cam
 		if (is_.pressed(key::m2))
 		{
 			auto [delta_x, delta_y] = is_.mouse_delta();
-			yaw_ = fmodf(yaw_ + delta_x * .5, 360.f);
+			yaw_ = fmodf(yaw_ + delta_x * .2, 360.f);
 
-			pitch_ += delta_y * .5;
+			pitch_ += delta_y * .2;
 		}
 
 		rot_ = quat::angle_axis({1.f, 0.f, 0.f, 1.f}, rad(-pitch_)) *
@@ -39,14 +39,14 @@ namespace vkb::cam
 
 		vec4 vel {0.f, 0.f, 0.f, 1.f};
 		if (is_.pressed(key::w))
-			vel.y = +dt * 5;
+			vel.y += dt * 5;
 		if (is_.pressed(key::s))
-			vel.y = -dt * 5;
+			vel.y -= dt * 5;
 
 		if (is_.pressed(key::a))
-			vel.x = -dt * 5;
+			vel.x -= dt * 5;
 		if (is_.pressed(key::d))
-			vel.x = +dt * 5;
+			vel.x += dt * 5;
 
 		float vel_modifier = 1.f;
 		if (is_.pressed(key::l_shift))
@@ -54,11 +54,13 @@ namespace vkb::cam
 		if (is_.pressed(key::l_ctrl))
 			vel_modifier = 0.5f;
 
+		vel.norm3();
 		pos_ += rot_.rotate(vel * vel_modifier);
 	}
 
 	mat4 free::view_mat()
 	{
+		// +90 to pitch, to turn the z axis to up axis, and y axis to front axis
 		return mat4::rotate({1.f, 0.f, 0.f, 1.f}, rad(-pitch_ + 90)) *
 		       mat4::rotate({0.f, 0.f, 1.f, 1.f}, rad(-yaw_)) * mat4::translate(-pos_);
 	}

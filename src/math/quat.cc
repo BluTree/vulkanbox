@@ -34,7 +34,7 @@ namespace vkb
 		};
 	}
 
-	quat quat::operator*(quat quat)
+	quat quat::operator*(quat quat) const
 	{
 		return {
 			w * quat.w - x * quat.x - y * quat.y - z * quat.z,
@@ -44,7 +44,18 @@ namespace vkb
 		};
 	}
 
-	vec4 quat::rotate(vec4 vec)
+	quat::operator mat4() const
+	{
+		float res[4][4] {
+			{1 - 2 * y * y - 2 * z * z, 2 * x * y - 2 * w * z,     2 * x * z + 2 * w * y,     0},
+			{2 * x * y + 2 * w * z,     1 - 2 * x * x - 2 * z * z, 2 * y * z - 2 * w * x,     0},
+			{2 * x * z - 2 * w * y,     2 * y * z + 2 * w * x,     1 - 2 * x * x - 2 * y * y, 0},
+			{0,						 0,						 0,						 1}
+        };
+		return {res};
+	}
+
+	vec4 quat::rotate(vec4 vec) const
 	{
 		vec4 qvec {x, y, z, 0};
 
@@ -52,10 +63,10 @@ namespace vkb
 		       (qvec.cross3(vec)) * 2 * w;
 	}
 
-	quat::operator mat4() const
+	quat quat::inverse() const
 	{
-		mat4 res;
-
-		return res;
+		float sq_len = w * w + x * x + y * y + z * z;
+		return {w * sq_len, -x * sq_len, -y * sq_len, -z * sq_len};
 	}
+
 }

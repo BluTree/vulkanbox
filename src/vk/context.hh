@@ -41,6 +41,8 @@ namespace vkb::vk
 
 		bool created() const;
 
+		void set_proj(float near, float far, float fov_deg);
+
 		bool init_model(model& model, mc::array_view<model::vert> verts,
 		                mc::array_view<uint16_t> idcs);
 		void destroy_model(model& model);
@@ -206,8 +208,11 @@ namespace vkb::vk
 		VkBuffer      uniform_buffers_[context::max_frames_in_flight] {nullptr};
 		VmaAllocation uniform_buffers_memory_[context::max_frames_in_flight] {nullptr};
 
-		mat4 view_;
-		mat4 proj_;
+		mat4  view_;
+		mat4  proj_;
+		float near_ {0.1f};
+		float far_ {100.f};
+		float fov_deg_ {70.f};
 
 		mc::vector<object*> objs_;
 

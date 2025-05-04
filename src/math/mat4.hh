@@ -37,6 +37,8 @@ namespace vkb
 
 		mat4 operator*(mat4 const& other);
 
+		mat4 transpose() const;
+
 		float const* operator[](uint8_t i) const&& = delete;
 
 	private:

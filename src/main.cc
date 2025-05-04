@@ -70,6 +70,8 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char** argv)
 		20, 22, 21, 22, 23, 21, // right face
 	};
 
+	ctx.set_proj(0.1f, 1000.f, 70.f);
+
 	mc::vector<vk::object> objs;
 	objs.reserve(10000);
 
@@ -108,7 +110,6 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char** argv)
 
 		is.clear_transitions();
 		main_window.update();
-		ui_ctx.update(dt);
 		cam.update(dt);
 
 		for (uint32_t i {0}; i < objs.size(); i++)
@@ -116,6 +117,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char** argv)
 
 		if (!main_window.closed() && !main_window.minimized())
 		{
+			ui_ctx.update(dt);
 			ctx.begin_draw(cam);
 			ctx.draw();
 			ui_ctx.draw();
