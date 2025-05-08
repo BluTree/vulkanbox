@@ -61,7 +61,7 @@ namespace vkb::cam
 	mat4 free::view_mat()
 	{
 		// +90 to pitch, to turn the z axis to up axis, and y axis to front axis
-		return mat4::rotate({1.f, 0.f, 0.f, 1.f}, rad(-pitch_ + 90)) *
-		       mat4::rotate({0.f, 0.f, 1.f, 1.f}, rad(-yaw_)) * mat4::translate(-pos_);
+		return mat4::translate(-pos_) * mat4::rotate({0.f, 0.f, 1.f, 1.f}, rad(-yaw_)) *
+		       mat4::rotate({1.f, 0.f, 0.f, 1.f}, rad(-pitch_ + 90));
 	}
 }

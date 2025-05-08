@@ -3,7 +3,7 @@
 layout(location = 0) in vec4 frag_col;
 layout(location = 1) in vec2 uv;
 
-layout(binding = 1) uniform sampler2D tex;
+layout(set = 0, binding = 1) uniform sampler2D tex;
 
 layout(location = 0) out vec4 out_col;
 

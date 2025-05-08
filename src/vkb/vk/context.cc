@@ -394,8 +394,8 @@ namespace vkb::vk
 			alignas(16) mat4 proj;
 		} ubo;
 
-		ubo.view = cam.view_mat().transpose();
-		ubo.proj = proj_.transpose();
+		ubo.view = cam.view_mat();
+		ubo.proj = proj_;
 
 		void* buff_mem;
 		vmaMapMemory(allocator_, staging_uniform_buffers_memory_[cur_frame_], &buff_mem);
@@ -591,12 +591,12 @@ namespace vkb::vk
 		create_info.ppEnabledExtensionNames = required_exts;
 		create_info.enabledExtensionCount = 3;
 
-		// char const* layers[] {"VK_LAYER_KHRONOS_validation"};
-		// if (!check_validation_layers(layers))
-		// 	return false;
+		char const* layers[] {"VK_LAYER_KHRONOS_validation"};
+		if (!check_validation_layers(layers))
+			return false;
 
-		// create_info.enabledLayerCount = 1;
-		// create_info.ppEnabledLayerNames = layers;
+		create_info.enabledLayerCount = 1;
+		create_info.ppEnabledLayerNames = layers;
 
 		uint32_t ext_cnt {0};
 		vkEnumerateInstanceExtensionProperties(nullptr, &ext_cnt, nullptr);
@@ -1081,63 +1081,43 @@ namespace vkb::vk
 
 	bool context::create_graphics_pipeline()
 	{
-		VkShaderModule vert_shader;
+		VkShaderModule shader;
 		{
-			uint8_t* vert_buf = nullptr;
-			int64_t  vert_size = 0;
-			FILE*    vert = fopen("res/shaders/default.vert.spirv", "rb");
+			uint8_t* shader_buf = nullptr;
+			int64_t  shader_size = 0;
+			FILE*    vert = fopen("res/shaders/default.spv", "rb");
 			if (!vert)
 			{
-				log::error("Failed to open %s", "res/shaders/default.vert.spirv");
+				log::error("Failed to open %s", "res/shaders/default.spv");
 				return false;
 			}
 
 			fseek(vert, 0, SEEK_END);
-			fgetpos(vert, &vert_size);
+			fgetpos(vert, &shader_size);
+
 			fseek(vert, 0, SEEK_SET);
-			vert_buf = new uint8_t[vert_size];
-			fread(vert_buf, 1, vert_size, vert);
+			shader_buf = new uint8_t[shader_size];
+			fread(shader_buf, 1, shader_size, vert);
 			fclose(vert);
 
-			vert_shader = create_shader(vert_buf, vert_size);
-			if (vert_buf)
-				delete[] vert_buf;
+			shader = create_shader(shader_buf, shader_size);
+			if (shader_buf)
+				delete[] shader_buf;
 		}
 
-		VkShaderModule frag_shader;
-		{
-			uint8_t* frag_buf = nullptr;
-			int64_t  frag_size = 0;
-			FILE*    frag = fopen("res/shaders/default.frag.spirv", "rb");
-			if (!frag)
-			{
-				log::error("Failed to open %s", "res/shaders/default.frag.spirv");
-				return false;
-			}
-
-			fseek(frag, 0, SEEK_END);
-			fgetpos(frag, &frag_size);
-			fseek(frag, 0, SEEK_SET);
-			frag_buf = new uint8_t[frag_size];
-			fread(frag_buf, 1, frag_size, frag);
-
-			fclose(frag);
-			frag_shader = create_shader(frag_buf, frag_size);
-			if (frag_buf)
-				delete[] frag_buf;
-		}
-
+		// TODO shader reflection to find the vertex entry point
 		VkPipelineShaderStageCreateInfo vert_create_info {};
 		vert_create_info.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
 		vert_create_info.stage = VK_SHADER_STAGE_VERTEX_BIT;
-		vert_create_info.module = vert_shader;
-		vert_create_info.pName = "main";
+		vert_create_info.module = shader;
+		vert_create_info.pName = "v_main";
 
+		// TODO shader reflection to find the fragment entry point
 		VkPipelineShaderStageCreateInfo frag_create_info {};
 		frag_create_info.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
 		frag_create_info.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-		frag_create_info.module = frag_shader;
-		frag_create_info.pName = "main";
+		frag_create_info.module = shader;
+		frag_create_info.pName = "f_main";
 
 		VkPipelineShaderStageCreateInfo shader_stages[] {vert_create_info,
 		                                                 frag_create_info};
@@ -1244,8 +1224,7 @@ namespace vkb::vk
 		if (vkCreatePipelineLayout(device_, &pipe_layout_info, nullptr, &pipe_layout_) !=
 		    VK_SUCCESS)
 		{
-			vkDestroyShaderModule(device_, vert_shader, nullptr);
-			vkDestroyShaderModule(device_, frag_shader, nullptr);
+			vkDestroyShaderModule(device_, shader, nullptr);
 
 			return false;
 		}
@@ -1269,8 +1248,7 @@ namespace vkb::vk
 		VkResult res = vkCreateGraphicsPipelines(device_, nullptr, 1, &create_info,
 		                                         nullptr, &graphics_pipe_);
 
-		vkDestroyShaderModule(device_, vert_shader, nullptr);
-		vkDestroyShaderModule(device_, frag_shader, nullptr);
+		vkDestroyShaderModule(device_, shader, nullptr);
 		return res == VK_SUCCESS;
 	}
 
@@ -1845,18 +1823,15 @@ namespace vkb::vk
 
 	bool context::create_descriptor_pool()
 	{
+		// TODO nvidia not coherent with spec. This will surely cause issues
 		VkDescriptorPoolSize pool_sizes[] = {
-			{VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-		     context::max_frames_in_flight + 1											   },
-			{VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,         context::max_frames_in_flight * 10000}
+			{VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1},
+			{VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,         1}
         };
 		VkDescriptorPoolCreateInfo pool_info {};
 		pool_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
 		pool_info.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
-		pool_info.maxSets = 0;
-		for (VkDescriptorPoolSize& pool_size : pool_sizes)
-			pool_info.maxSets += pool_size.descriptorCount;
-		pool_info.poolSizeCount = 2;
+		pool_info.maxSets = context::max_frames_in_flight * 10001;
 		pool_info.pPoolSizes = pool_sizes;
 		VkResult res = vkCreateDescriptorPool(device_, &pool_info, nullptr, &desc_pool_);
 
@@ -1915,9 +1890,9 @@ namespace vkb::vk
 
 	void context::record_command_buffer(VkCommandBuffer cmd, object* obj)
 	{
-		mat4 trs = obj->trs.transpose();
+		// mat4 trs = obj->trs.transpose();
 		vkCmdPushConstants(cmd, pipe_layout_, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(mat4),
-		                   &trs);
+		                   &obj->trs);
 		VkViewport viewport {};
 		viewport.x = 0.0f;
 		viewport.y = 0.0f;

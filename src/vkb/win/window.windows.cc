@@ -1,7 +1,7 @@
 #include "window.hh"
 
 #include "../input/input_system.hh"
-#include "log.hh"
+#include "../log.hh"
 
 #include <imgui/backends/imgui_impl_win32.h>
 #include <win32/misc.h>

@@ -1,6 +1,6 @@
 #pragma once
 
-#define VMA_CONFIGURATION_USER_INCLUDES_H <vk/vma/vma_user.hh>
+#define VMA_CONFIGURATION_USER_INCLUDES_H <vkb/vk/vma/vma_user.hh>
 #define VMA_ASSERT(expr) vkb::log::assert(expr, "vma")
 // #define VMA_DEBUG_LOG_FORMAT(format, ...) vkb::log::info("vma: " format, __VA_ARGS__)
 #define VMA_DEBUG_LEAK_LOG_FORMAT(format, ...) vkb::log::warn("vma: " format, __VA_ARGS__)

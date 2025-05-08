@@ -37,15 +37,15 @@ namespace vkb
 		mat4 res {mat4::identity};
 
 		res[0][0] = axis.x * axis.x * inv_cos + a_cos;
-		res[0][1] = axis.x * axis.y * inv_cos + axis.z * a_sin;
-		res[0][2] = axis.x * axis.z * inv_cos - axis.y * a_sin;
+		res[0][1] = axis.y * axis.x * inv_cos - axis.z * a_sin;
+		res[0][2] = axis.z * axis.x * inv_cos + axis.y * a_sin;
 
-		res[1][0] = axis.y * axis.x * inv_cos - axis.z * a_sin;
+		res[1][0] = axis.x * axis.y * inv_cos + axis.z * a_sin;
 		res[1][1] = axis.y * axis.y * inv_cos + a_cos;
-		res[1][2] = axis.y * axis.z * inv_cos + axis.x * a_sin;
+		res[1][2] = axis.z * axis.y * inv_cos - axis.x * a_sin;
 
-		res[2][0] = axis.z * axis.x * inv_cos + axis.y * a_sin;
-		res[2][1] = axis.z * axis.y * inv_cos - axis.x * a_sin;
+		res[2][0] = axis.x * axis.z * inv_cos - axis.y * a_sin;
+		res[2][1] = axis.y * axis.z * inv_cos + axis.x * a_sin;
 		res[2][2] = axis.z * axis.z * inv_cos + a_cos;
 
 		return res;
@@ -55,10 +55,10 @@ namespace vkb
 	{
 		// clang-format off
 		return {
-			1.f, 0.f, 0.f, trans.x,
-			0.f, 1.f, 0.f, trans.y,
-			0.f, 0.f, 1.f, trans.z,
-			0.f, 0.f, 0.f, 1.f,
+			1.f, 0.f, 0.f, 0.f,
+			0.f, 1.f, 0.f, 0.f,
+			0.f, 0.f, 1.f, 0.f,
+			trans.x, trans.y, trans.z, 1.f,
 		};
 		// clang-format on
 	}
@@ -87,8 +87,8 @@ namespace vkb
 		return {
 			near / r, 0.f,       0.f,  0.f,
 			0.f,      -near / t, 0.f,  0.f,
-			0.f,      0.f,       nf,   nf2,
-			0.f,      0.f,       -1.f, 0.f
+			0.f,      0.f,       nf,   -1.f,
+			0.f,      0.f,       nf2, 0.f
 		};
 		// clang-format on
 	}
@@ -101,10 +101,10 @@ namespace vkb
 		float nf2 = -(far + near) / (far - near);
 		// clang-format off
 		return {
-			2 / (r - l), 0.f,               0.f, rl,
-			0.f,              -2 / (t - b), 0.f, tb,
-			0.f,              0.f,          nf,  nf2,
-			0.f,              0.f,          0.f, 1.f
+			2 / (r - l), 0.f,               0.f, 0.f,
+			0.f,              -2 / (t - b), 0.f, 0.f,
+			0.f,              0.f,          nf,  0.f,
+			rl,              tb,          nf2, 1.f
 		};
 		// clang-format on
 	}
@@ -117,10 +117,10 @@ namespace vkb
 
 		// clang-format off
 		return {
-			x.x,  x.y,  x.z,  -x.dot3(eye),
-			y.x,  y.y,  y.z,  -y.dot3(eye),
-			-z.x, -z.y, -z.z, z.dot3(eye),
-			0.f, 0.f, 0.f, 1.f
+			x.x,  y.x,  -z.x,  0.f,
+			x.y,  y.y,  -z.y,  0.f,
+			x.z, y.z, -z.z, 0.f,
+			-x.dot3(eye), -y.dot3(eye), z.dot3(eye), 1.f
 		};
 		// clang-format on
 	}

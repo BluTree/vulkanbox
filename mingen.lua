@@ -9,6 +9,7 @@ imgui = require('deps/imgui')
 mincore = require('deps/mincore')
 stb = require('deps/stb')
 vma = require('deps/vma')
+slang = require('deps/slang')
 
 include_dirs = merge(
 	{mg.get_build_dir() .. 'deps/', 'src/'},
@@ -73,7 +74,7 @@ end
 local vkb = mg.project({
 	name = 'vulkanbox',
 	type = mg.project_type.executable,
-	sources = {'src/**.cc'},
+	sources = {'src/vkb/**.cc'},
 	includes = include_dirs,
 	compile_options = merge('-g', '-std=c++20', '-Wall', '-Wextra', '-Werror', platform_define, platform_compile_options),
 	link_options = merge('-g', platform_link_options),
@@ -83,46 +84,47 @@ local vkb = mg.project({
 	}
 })
 
--- Manage list of source patterns that are platform specific
-local excluded_sources = {'.windows.cc', '.linux.cc'}
-local platform_specific_sources = '.' .. mg.platform() .. '.cc'
-for i=1,#excluded_sources do
-	if excluded_sources[i] == platform_specific_sources then
-		table.remove(excluded_sources, i)
-		break
-	end
-end
+remove_platform_sources(vkb)
 
--- Remove the platform specific sources not valid on the generated platform
-local i = 1
-local j = #vkb.sources
-while i <= j do
-	for k=1,#excluded_sources do
-		pos = string.find(vkb.sources[i].file, excluded_sources[k])
-		if pos ~= nil then
-			vkb.sources[i] = vkb.sources[j]
-			vkb.sources[j] = nil
-			j = j - 1
-		end
-	end
-	i = i + 1
-end
+local slangrc = mg.project({
+	name = 'slangrc',
+	type = mg.project_type.executable,
+	sources = {'src/slangrc/**.cc'},
+	includes = merge(include_dirs, slang.includes),
+	compile_options = merge('-g', '-std=c++20', '-Wall', '-Wextra', '-Werror', platform_define, platform_compile_options),
+	link_options = merge('-g', platform_link_options),
+	dependencies = merge(slang.project, mincore.project),
+	release = {
+		compile_options = {'-O2'}
+	}
+})
+
+remove_platform_sources(slangrc)
 
 -- Shaders
-shaders = mg.collect_files('res/shaders/*.glsl')
-for i=1,#shaders do
-	shader_stage = ''
-	if (string.find(shaders[i], '.vert') ~= nil) then
-		shader_stage = 'vertex'
-	elseif (string.find(shaders[i], '.frag') ~= nil) then
-		shader_stage = 'fragment'
-	end
+-- shaders = mg.collect_files('res/shaders/*.glsl')
+-- for i=1,#shaders do
+-- 	shader_stage = ''
+-- 	if (string.find(shaders[i], '.vert') ~= nil) then
+-- 		shader_stage = 'vertex'
+-- 	elseif (string.find(shaders[i], '.frag') ~= nil) then
+-- 		shader_stage = 'fragment'
+-- 	end
 
-	spirv = mg.get_build_dir() .. 'bin/' .. string.gsub(shaders[i], '.glsl', '.spirv')
+-- 	spirv = mg.get_build_dir() .. 'bin/' .. string.gsub(shaders[i], '.glsl', '.spirv')
+-- 	mg.add_post_build_cmd(vkb, {
+-- 		input = shaders[i],
+-- 		output = spirv,
+-- 		cmd = 'glslc -fshader-stage=' .. shader_stage .. ' ${in} -o ${out}'
+-- 	})
+-- end
+shaders = mg.collect_files('res/shaders/*.slang')
+for i=1,#shaders do
+	spirv = mg.get_build_dir() .. 'bin/' .. string.gsub(shaders[i], '.slang', '.spv')
 	mg.add_post_build_cmd(vkb, {
 		input = shaders[i],
 		output = spirv,
-		cmd = 'glslc -fshader-stage=' .. shader_stage .. ' ${in} -o ${out}'
+		cmd = 'slangc ${in} -profile glsl_450 -matrix-layout-row-major -fvk-use-entrypoint-name -o ${out}'
 	})
 end
 
@@ -136,5 +138,5 @@ for i=1,#textures do
 end
 
 if mg.need_generate() then
-	mg.generate({vkb})
+	mg.generate({vkb, slangrc})
 end
