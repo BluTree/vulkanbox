@@ -26,6 +26,26 @@
 				"$gcc",
 				"$msCompile"
 			]
+		},
+		{
+			"label": "build slangrc",
+			"type": "shell",
+			"command": "ninja -C build bin/slangrc",
+			"windows": {
+				"command": "ninja -C build bin/slangrc.exe"
+			},
+			"presentation": {
+				"echo": true,
+				"reveal": "silent",
+				"focus": false,
+				"panel": "shared",
+				"showReuseMessage": false,
+				"clear": true
+			},
+			"problemMatcher": [
+				"$gcc",
+				"$msCompile"
+			]
 		}
 	],
 	"inputs": [

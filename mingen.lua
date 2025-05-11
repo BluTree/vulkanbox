@@ -101,30 +101,14 @@ local slangrc = mg.project({
 
 remove_platform_sources(slangrc)
 
--- Shaders
--- shaders = mg.collect_files('res/shaders/*.glsl')
--- for i=1,#shaders do
--- 	shader_stage = ''
--- 	if (string.find(shaders[i], '.vert') ~= nil) then
--- 		shader_stage = 'vertex'
--- 	elseif (string.find(shaders[i], '.frag') ~= nil) then
--- 		shader_stage = 'fragment'
--- 	end
-
--- 	spirv = mg.get_build_dir() .. 'bin/' .. string.gsub(shaders[i], '.glsl', '.spirv')
--- 	mg.add_post_build_cmd(vkb, {
--- 		input = shaders[i],
--- 		output = spirv,
--- 		cmd = 'glslc -fshader-stage=' .. shader_stage .. ' ${in} -o ${out}'
--- 	})
--- end
+slangrc_bin = '"' .. mg.get_build_dir() .. 'bin/slangrc.exe"'
 shaders = mg.collect_files('res/shaders/*.slang')
 for i=1,#shaders do
 	spirv = mg.get_build_dir() .. 'bin/' .. string.gsub(shaders[i], '.slang', '.spv')
-	mg.add_post_build_cmd(vkb, {
+	mg.add_post_build_cmd(slangrc, {
 		input = shaders[i],
 		output = spirv,
-		cmd = 'slangc ${in} -profile glsl_450 -matrix-layout-row-major -fvk-use-entrypoint-name -o ${out}'
+		cmd = slangrc_bin .. ' ${in} ${out}'
 	})
 end
 

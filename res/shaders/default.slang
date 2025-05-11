@@ -19,9 +19,6 @@ struct set_0
 
 ParameterBlock<set_0> set0;
 
-[[vk::push_constant]]
-ConstantBuffer<float4x4> model;
-
 struct vertex_out
 {
 	float4 pos : SV_Position;
@@ -30,7 +27,7 @@ struct vertex_out
 };
 
 [shader("vertex")]
-vertex_out v_main(vertex in)
+vertex_out v_main(vertex in, uniform float4x4 model)
 {
 	vertex_out out;
 	float4x4 mvp = mul(mul(model, set0.cam.view), set0.cam.proj);

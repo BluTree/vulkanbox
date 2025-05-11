@@ -17,6 +17,26 @@
 			"preLaunchTask": "build"
 		},
 		{
+			"name": "slangrc windows",
+			"type": "cppvsdbg",
+			"request": "launch",
+			"program": "${workspaceFolder}/build/bin/slangrc.exe",
+			"args": [
+				"../res/shaders/default.slang",
+				"-profile",
+				"glsl_450",
+				"-matrix-layout-row-major",
+				"-fvk-use-entrypoint-name",
+				"-o",
+				"shaders/bin/default.spv"
+			],
+			"stopAtEntry": false,
+			"cwd": "${workspaceFolder}/build/",
+			"environment": [],
+			"console": "integratedTerminal",
+			"preLaunchTask": "build slangrc"
+		},
+		{
 			"name": "attach",
 			"type": "cppvsdbg",
 			"request": "attach",
