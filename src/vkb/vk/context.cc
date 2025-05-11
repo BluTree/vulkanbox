@@ -10,6 +10,7 @@
 #include <stb/stb_image.h>
 
 #include <vulkan/vulkan_win32.h>
+#include <yyjson.h>
 
 #ifdef VKB_WINDOWS
 #define _USE_MATH_DEFINES
@@ -1105,22 +1106,42 @@ namespace vkb::vk
 				delete[] shader_buf;
 		}
 
-		// TODO shader reflection to find the vertex entry point
-		VkPipelineShaderStageCreateInfo vert_create_info {};
-		vert_create_info.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-		vert_create_info.stage = VK_SHADER_STAGE_VERTEX_BIT;
-		vert_create_info.module = shader;
-		vert_create_info.pName = "v_main";
+		yyjson_read_err err;
+		yyjson_doc*     doc =
+			yyjson_read_file("res/shaders/default.spv.json", 0, nullptr, &err);
 
-		// TODO shader reflection to find the fragment entry point
-		VkPipelineShaderStageCreateInfo frag_create_info {};
-		frag_create_info.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-		frag_create_info.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-		frag_create_info.module = shader;
-		frag_create_info.pName = "f_main";
+		if (!doc)
+		{
+			log::error("Failed to read shader reflection: %s at %ju", err.msg, err.pos);
+			return false;
+		}
 
-		VkPipelineShaderStageCreateInfo shader_stages[] {vert_create_info,
-		                                                 frag_create_info};
+		yyjson_val* root = yyjson_doc_get_root(doc);
+		yyjson_val* entry_points = yyjson_obj_get(root, "entryPoints");
+		mc::vector<VkPipelineShaderStageCreateInfo> shader_stages;
+		shader_stages.reserve(yyjson_arr_size(entry_points));
+
+		yyjson_arr_iter iter;
+		yyjson_arr_iter_init(entry_points, &iter);
+		yyjson_val* entry;
+		while ((entry = yyjson_arr_iter_next(&iter)))
+		{
+			VkPipelineShaderStageCreateInfo create_info {};
+			create_info.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+			create_info.module = shader;
+
+			yyjson_val*     stage = yyjson_obj_get(entry, "stage");
+			mc::string_view stage_str {yyjson_get_str(stage)};
+			// TODO list all possible stages
+			if (stage_str == "vertex")
+				create_info.stage = VK_SHADER_STAGE_VERTEX_BIT;
+			else if (stage_str == "fragment")
+				create_info.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+			yyjson_val* name = yyjson_obj_get(entry, "name");
+			create_info.pName = yyjson_get_str(name);
+			shader_stages.emplace_back(create_info);
+		}
 
 		VkVertexInputBindingDescription binding_desc = model::binding_desc();
 		mc::array<VkVertexInputAttributeDescription, 3> attribute_descs =
@@ -1225,14 +1246,15 @@ namespace vkb::vk
 		    VK_SUCCESS)
 		{
 			vkDestroyShaderModule(device_, shader, nullptr);
+			yyjson_doc_free(doc);
 
 			return false;
 		}
 
 		VkGraphicsPipelineCreateInfo create_info {};
 		create_info.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
-		create_info.stageCount = 2;
-		create_info.pStages = shader_stages;
+		create_info.stageCount = shader_stages.size();
+		create_info.pStages = shader_stages.data();
 		create_info.pVertexInputState = &vert_input_info;
 		create_info.pInputAssemblyState = &input_assembly;
 		create_info.pViewportState = &viewport_state;
@@ -1249,6 +1271,7 @@ namespace vkb::vk
 		                                         nullptr, &graphics_pipe_);
 
 		vkDestroyShaderModule(device_, shader, nullptr);
+		yyjson_doc_free(doc);
 		return res == VK_SUCCESS;
 	}
 

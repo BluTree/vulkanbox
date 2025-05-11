@@ -19,7 +19,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char** argv)
 	desc.compilerOptionEntries = entries;
 	desc.compilerOptionEntryCount = sizeof(entries) / sizeof(slang::CompilerOptionEntry);
 	slang::TargetDesc targetDesc = {};
-	targetDesc.format = SLANG_SPIRV_ASM;
+	targetDesc.format = SLANG_SPIRV;
 	targetDesc.profile = global_session->findProfile("spirv_1_6");
 	targetDesc.flags = SLANG_TARGET_FLAG_GENERATE_SPIRV_DIRECTLY;
 	desc.targetCount = 1;
@@ -76,7 +76,8 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char** argv)
 	FILE* file = fopen(argv[2], "wb");
 	if (file)
 	{
-		fwrite(spv->getBufferPointer(), 1, spv->getBufferSize(), file);
+		uint64_t s = spv->getBufferSize();
+		fwrite(spv->getBufferPointer(), 1, s, file);
 		fclose(file);
 	}
 	char* jsonFilePath = new char[strlen(argv[2] + 5 + 1)];
