@@ -10,17 +10,21 @@
 
 #include <math.h>
 #include <stdlib.h>
+#include <string.h>
 
 #ifdef USE_SUPERLUMINAL
 #include <Superluminal/PerformanceAPI.h>
 #endif
 
-int main([[maybe_unused]] int argc, [[maybe_unused]] char** argv)
+int main(int argc, char** argv)
 {
+	bool enable_validation = false;
+	if (argc > 1)
+		enable_validation = strcmp(argv[1], "--validate") == 0;
 	using namespace vkb;
 	input_system is;
 	window       main_window(&is);
-	vk::context  ctx(main_window);
+	vk::context  ctx(main_window, enable_validation);
 
 	cam::free   cam(is, main_window);
 	ui::context ui_ctx(main_window, is, ctx, cam);

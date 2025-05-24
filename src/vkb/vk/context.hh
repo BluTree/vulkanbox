@@ -36,7 +36,7 @@ namespace vkb::vk
 		friend ui::context;
 
 	public:
-		context(window const& win);
+		context(window const& win, bool enable_validation);
 		~context();
 
 		bool created() const;
@@ -73,7 +73,7 @@ namespace vkb::vk
 			VkDebugUtilsMessageTypeFlagsEXT             message_type,
 			VkDebugUtilsMessengerCallbackDataEXT const* callback_data, void* ud);
 
-		bool create_instance();
+		bool create_instance(bool enable_validation);
 		bool register_debug_callback();
 		bool check_validation_layers(mc::array_view<char const*> const& layers);
 

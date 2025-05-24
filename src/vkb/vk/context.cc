@@ -49,14 +49,14 @@ namespace vkb::vk
 		}
 	}
 
-	context::context(window const& win)
+	context::context(window const& win, bool enable_validation)
 	: win_ {win}
 	{
 		auto [w, h] = win_.size();
 		proj_ = mat4::persp_proj(near_, far_, w / (float)h, rad(fov_deg_));
 		view_ = mat4::look_at({0.f, -2.f, 2.f, 1.f}, vec4(), {0.f, 0.f, 1.f, 1.f});
 
-		created_ = create_instance();
+		created_ = create_instance(enable_validation);
 		if (!created_)
 		{
 			log::error("Failed to create VkInstance");
@@ -573,7 +573,7 @@ namespace vkb::vk
 		return VK_FALSE;
 	}
 
-	bool context::create_instance()
+	bool context::create_instance(bool enable_validation)
 	{
 		VkApplicationInfo app_info = {};
 		app_info.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
@@ -592,12 +592,15 @@ namespace vkb::vk
 		create_info.ppEnabledExtensionNames = required_exts;
 		create_info.enabledExtensionCount = 3;
 
-		char const* layers[] {"VK_LAYER_KHRONOS_validation"};
-		if (!check_validation_layers(layers))
-			return false;
+		if (enable_validation)
+		{
+			char const* layers[] {"VK_LAYER_KHRONOS_validation"};
+			if (!check_validation_layers(layers))
+				return false;
 
-		create_info.enabledLayerCount = 1;
-		create_info.ppEnabledLayerNames = layers;
+			create_info.enabledLayerCount = 1;
+			create_info.ppEnabledLayerNames = layers;
+		}
 
 		uint32_t ext_cnt {0};
 		vkEnumerateInstanceExtensionProperties(nullptr, &ext_cnt, nullptr);

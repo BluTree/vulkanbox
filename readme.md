@@ -18,3 +18,5 @@ Uses [mingen](https://github.com/BluTree/mingen) for compilation. Generates the 
 - [stb](https://github.com/nothings/stb): Used for image loading header.
 - [Superluminal](https://superluminal.eu/): (Optional) Profiling tool. Used to instrument the frame timing for a later use.
 - [Vulkan](https://www.vulkan.org/): Cross-platform rendering API
+- [Slang](https://shader-slang.org/): Shader language
+- [yyjson](https://github.com/ibireme/yyjson): C Reader/Writer for JSON files
