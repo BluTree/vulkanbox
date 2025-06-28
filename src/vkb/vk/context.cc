@@ -219,6 +219,9 @@ namespace vkb::vk
 			}
 		}
 
+		for (uint32_t i {0}; i < recycled_semaphores_.size(); ++i)
+			vkDestroySemaphore(device_, recycled_semaphores_[i], nullptr);
+
 		if (command_pool_)
 			vkDestroyCommandPool(device_, command_pool_, nullptr);
 
@@ -365,11 +368,22 @@ namespace vkb::vk
 
 	void context::begin_draw(cam::free& cam)
 	{
-		vkWaitForFences(device_, 1, &in_flight_fences_[cur_frame_], VK_TRUE, UINT64_MAX);
+		VkSemaphore new_img_avail_semaphore {nullptr};
+		if (recycled_semaphores_.empty())
+		{
+			VkSemaphoreCreateInfo info {};
+			info.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+			vkCreateSemaphore(device_, &info, nullptr, &new_img_avail_semaphore);
+		}
+		else
+		{
+			new_img_avail_semaphore = recycled_semaphores_.back();
+			recycled_semaphores_.pop_back();
+		}
 
-		VkResult res = vkAcquireNextImageKHR(device_, swapchain_, UINT64_MAX,
-		                                     img_avail_semaphores_[cur_frame_],
-		                                     VK_NULL_HANDLE, &img_idx_);
+		VkResult res =
+			vkAcquireNextImageKHR(device_, swapchain_, UINT64_MAX,
+		                          new_img_avail_semaphore, VK_NULL_HANDLE, &img_idx_);
 
 		if (res == VK_ERROR_OUT_OF_DATE_KHR)
 		{
@@ -377,15 +391,22 @@ namespace vkb::vk
 			return;
 		}
 
-		vkResetFences(device_, 1, &in_flight_fences_[cur_frame_]);
+		vkWaitForFences(device_, 1, &in_flight_fences_[img_idx_], VK_TRUE, UINT64_MAX);
+		vkResetFences(device_, 1, &in_flight_fences_[img_idx_]);
 
-		vkResetCommandBuffer(command_buffers_[cur_frame_], 0);
+		vkResetCommandBuffer(command_buffers_[img_idx_], 0);
+
+		VkSemaphore old_semaphore = img_avail_semaphores_[img_idx_];
+		if (old_semaphore)
+			recycled_semaphores_.emplace_back(old_semaphore);
+		img_avail_semaphores_[img_idx_] = new_img_avail_semaphore;
+
 		VkCommandBufferBeginInfo begin_info {};
 		begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 		begin_info.flags = 0;
 		begin_info.pInheritanceInfo = nullptr;
 
-		res = vkBeginCommandBuffer(command_buffers_[cur_frame_], &begin_info);
+		res = vkBeginCommandBuffer(command_buffers_[img_idx_], &begin_info);
 		if (res != VK_SUCCESS)
 			return;
 
@@ -399,29 +420,29 @@ namespace vkb::vk
 		ubo.proj = proj_;
 
 		void* buff_mem;
-		vmaMapMemory(allocator_, staging_uniform_buffers_memory_[cur_frame_], &buff_mem);
+		vmaMapMemory(allocator_, staging_uniform_buffers_memory_[img_idx_], &buff_mem);
 		memcpy(buff_mem, &ubo, sizeof(ubo));
-		vmaUnmapMemory(allocator_, staging_uniform_buffers_memory_[cur_frame_]);
+		vmaUnmapMemory(allocator_, staging_uniform_buffers_memory_[img_idx_]);
 
 		VkBufferCopy2 region {};
 		region.sType = VK_STRUCTURE_TYPE_BUFFER_COPY_2;
 		region.size = sizeof(ubo);
 		VkCopyBufferInfo2 copy {};
 		copy.sType = VK_STRUCTURE_TYPE_COPY_BUFFER_INFO_2;
-		copy.srcBuffer = staging_uniform_buffers_[cur_frame_];
-		copy.dstBuffer = uniform_buffers_[cur_frame_];
+		copy.srcBuffer = staging_uniform_buffers_[img_idx_];
+		copy.dstBuffer = uniform_buffers_[img_idx_];
 		copy.regionCount = 1;
 		copy.pRegions = &region;
 
-		vkCmdCopyBuffer2(command_buffers_[cur_frame_], &copy);
+		vkCmdCopyBuffer2(command_buffers_[img_idx_], &copy);
 
 		VkBufferMemoryBarrier barrier {};
 		barrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
-		barrier.buffer = uniform_buffers_[cur_frame_];
+		barrier.buffer = uniform_buffers_[img_idx_];
 		barrier.size = sizeof(ubo);
 		barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
 		barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-		vkCmdPipelineBarrier(command_buffers_[cur_frame_], VK_PIPELINE_STAGE_TRANSFER_BIT,
+		vkCmdPipelineBarrier(command_buffers_[img_idx_], VK_PIPELINE_STAGE_TRANSFER_BIT,
 		                     VK_PIPELINE_STAGE_VERTEX_SHADER_BIT, 0, 0, nullptr, 1,
 		                     &barrier, 0, nullptr);
 
@@ -440,41 +461,41 @@ namespace vkb::vk
 		render_pass_info.clearValueCount = 2;
 		render_pass_info.pClearValues = clear_col;
 
-		vkCmdBeginRenderPass(command_buffers_[cur_frame_], &render_pass_info,
+		vkCmdBeginRenderPass(command_buffers_[img_idx_], &render_pass_info,
 		                     VK_SUBPASS_CONTENTS_INLINE);
 	}
 
 	void context::draw()
 	{
-		vkCmdBindPipeline(command_buffers_[cur_frame_], VK_PIPELINE_BIND_POINT_GRAPHICS,
+		vkCmdBindPipeline(command_buffers_[img_idx_], VK_PIPELINE_BIND_POINT_GRAPHICS,
 		                  graphics_pipe_);
 
 		for (uint32_t i {0}; i < objs_.size(); ++i)
-			record_command_buffer(command_buffers_[cur_frame_], objs_[i]);
+			record_command_buffer(command_buffers_[img_idx_], objs_[i]);
 	}
 
 	void context::present()
 	{
-		vkCmdEndRenderPass(command_buffers_[cur_frame_]);
+		vkCmdEndRenderPass(command_buffers_[img_idx_]);
 
-		vkEndCommandBuffer(command_buffers_[cur_frame_]);
+		vkEndCommandBuffer(command_buffers_[img_idx_]);
 		VkSubmitInfo submit_info {};
 		submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 
-		VkSemaphore          sem_wait[] {img_avail_semaphores_[cur_frame_]};
+		VkSemaphore          sem_wait[] {img_avail_semaphores_[img_idx_]};
 		VkPipelineStageFlags stages_wait[] {
 			VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
 		submit_info.waitSemaphoreCount = 1;
 		submit_info.pWaitSemaphores = sem_wait;
 		submit_info.pWaitDstStageMask = stages_wait;
 		submit_info.commandBufferCount = 1;
-		submit_info.pCommandBuffers = &command_buffers_[cur_frame_];
+		submit_info.pCommandBuffers = &command_buffers_[img_idx_];
 
-		VkSemaphore sem_signal[] {draw_end_semaphores_[cur_frame_]};
+		VkSemaphore sem_signal[] {draw_end_semaphores_[img_idx_]};
 		submit_info.signalSemaphoreCount = 1;
 		submit_info.pSignalSemaphores = sem_signal;
 
-		vkQueueSubmit(graphics_queue_, 1, &submit_info, in_flight_fences_[cur_frame_]);
+		vkQueueSubmit(graphics_queue_, 1, &submit_info, in_flight_fences_[img_idx_]);
 
 		VkPresentInfoKHR present_info {};
 		present_info.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
@@ -1866,8 +1887,8 @@ namespace vkb::vk
 
 	bool context::create_descriptor_sets(object* obj)
 	{
-		VkDescriptorSetLayout layouts[context::max_frames_in_flight] {desc_set_layout_,
-		                                                              desc_set_layout_};
+		VkDescriptorSetLayout layouts[context::max_frames_in_flight] {
+			desc_set_layout_, desc_set_layout_, desc_set_layout_};
 		VkDescriptorSetAllocateInfo alloc_info {};
 		alloc_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
 		alloc_info.descriptorPool = desc_pool_;

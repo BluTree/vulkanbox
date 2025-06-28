@@ -22,7 +22,7 @@ namespace vkb::vk
 		double rot {0.0};
 		float  rot_speed {1.0f};
 
-		VkDescriptorSet desc_sets_[2] {nullptr};
+		VkDescriptorSet desc_sets_[3] {nullptr};
 
 		model*   model;
 		texture* tex;

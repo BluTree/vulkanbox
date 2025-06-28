@@ -64,7 +64,7 @@ namespace vkb::vk
 		void wait_completion();
 
 	private:
-		constexpr static uint8_t max_frames_in_flight {2};
+		constexpr static uint8_t max_frames_in_flight {3};
 		uint8_t                  cur_frame_ {0};
 		uint32_t                 img_idx_ {0};
 
@@ -196,6 +196,7 @@ namespace vkb::vk
 		VkCommandPool   command_pool_ {nullptr};
 		VkCommandBuffer command_buffers_[context::max_frames_in_flight] {nullptr};
 
+		mc::vector<VkSemaphore> recycled_semaphores_;
 		VkSemaphore img_avail_semaphores_[context::max_frames_in_flight] {nullptr};
 		VkSemaphore draw_end_semaphores_[context::max_frames_in_flight] {nullptr};
 		VkFence     in_flight_fences_[context::max_frames_in_flight] {nullptr};
