@@ -1,11 +1,30 @@
 #pragma once
 
+#include "material_layout.hh"
+
+#include <string.hh>
 #include <string_view.hh>
 
-namespace vk::vkb
+#include <stdint.h>
+
+#include <vulkan/vulkan.h>
+
+namespace vkb::vk
 {
 	class material
 	{
-		material(mc::string_view vert_shader, mc::string_view frag_shader);
+	public:
+		material(mc::string_view shader);
+
+		bool create_pipeline_state();
+
+	private:
+		mc::string path_;
+
+		layout layout_;
+
+		[[maybe_unused]] VkDescriptorSetLayout desc_set_layout_ {nullptr};
+		[[maybe_unused]] VkPipelineLayout      pipe_layout_ {nullptr};
+		[[maybe_unused]] VkPipeline            pipe_ {nullptr};
 	};
 }

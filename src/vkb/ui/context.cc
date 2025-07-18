@@ -12,8 +12,28 @@
 #include <imgui/backends/imgui_impl_win32.h>
 #include <imgui/imgui.h>
 
+#include "vulkan/vulkan_win32.h"
+#include "win32/misc.h"
+
 namespace vkb::ui
 {
+	namespace
+	{
+		static int ImGui_ImplWin32_CreateVkSurface(ImGuiViewport* viewport,
+		                                           ImU64          vk_instance,
+		                                           void const*    vk_allocator,
+		                                           ImU64*         out_vk_surface)
+		{
+			VkWin32SurfaceCreateInfoKHR createInfo = {};
+			createInfo.sType = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR;
+			createInfo.hwnd = (HWND)viewport->PlatformHandleRaw;
+			createInfo.hinstance = GetModuleHandleW(nullptr);
+			return (int)vkCreateWin32SurfaceKHR((VkInstance)vk_instance, &createInfo,
+			                                    (VkAllocationCallbacks*)vk_allocator,
+			                                    (VkSurfaceKHR*)out_vk_surface);
+		}
+	}
+
 	context::context(window& win, input_system& is, vk::context& vk, cam::free& cam)
 	: win_ {win}
 	, is_ {is}
@@ -25,6 +45,7 @@ namespace vkb::ui
 		io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
 
 		ImGui_ImplWin32_Init(win_.native_handle());
+		ImGui::GetPlatformIO().Platform_CreateVkSurface = ImGui_ImplWin32_CreateVkSurface;
 
 		ImGui_ImplVulkan_InitInfo init_info {};
 		vk_.fill_init_info(init_info);
