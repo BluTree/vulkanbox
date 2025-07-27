@@ -29,6 +29,7 @@ namespace vkb::vk
 	context::context(window const& win, surface& surface)
 	: win_ {win}
 	, surface_ {surface}
+	, mat_ {"res/shaders/default.spv"}
 	{
 		auto [w, h] = win_.size();
 		proj_ = mat4::persp_proj(near_, far_, w / (float)h, rad(fov_deg_));
@@ -113,8 +114,6 @@ namespace vkb::vk
 		for (uint32_t i {0}; i < recycled_semaphores_.size(); ++i)
 			vkDestroySemaphore(inst.get_device(), recycled_semaphores_[i], nullptr);
 
-		if (graphics_pipe_)
-			vkDestroyPipeline(inst.get_device(), graphics_pipe_, nullptr);
 		if (pipe_layout_)
 			vkDestroyPipelineLayout(inst.get_device(), pipe_layout_, nullptr);
 		if (desc_set_layout_)
@@ -361,18 +360,18 @@ namespace vkb::vk
 		viewport.height = surface_.get_extent().height;
 		viewport.minDepth = 0.0f;
 		viewport.maxDepth = 1.0f;
-		vkCmdSetViewport(command_buffers_[img_idx_], 0, 1, &viewport);
+		vkCmdSetViewportWithCount(command_buffers_[img_idx_], 1, &viewport);
 
 		VkRect2D scissor {};
 		scissor.offset = {0, 0};
 		scissor.extent = surface_.get_extent();
-		vkCmdSetScissor(command_buffers_[img_idx_], 0, 1, &scissor);
+		vkCmdSetScissorWithCount(command_buffers_[img_idx_], 1, &scissor);
 	}
 
 	void context::draw()
 	{
 		vkCmdBindPipeline(command_buffers_[img_idx_], VK_PIPELINE_BIND_POINT_GRAPHICS,
-		                  graphics_pipe_);
+		                  mat_.get_pipeline());
 
 		for (uint32_t i {0}; i < objs_.size(); ++i)
 			record_command_buffer(command_buffers_[img_idx_], objs_[i]);
@@ -522,208 +521,7 @@ namespace vkb::vk
 
 	bool context::create_graphics_pipeline()
 	{
-		instance& inst = instance::get();
-
-		VkShaderModule shader;
-		{
-			uint8_t* shader_buf = nullptr;
-			int64_t  shader_size = 0;
-			FILE*    vert = fopen("res/shaders/default.spv", "rb");
-			if (!vert)
-			{
-				log::error("Failed to open %s", "res/shaders/default.spv");
-				return false;
-			}
-
-			fseek(vert, 0, SEEK_END);
-			fgetpos(vert, &shader_size);
-
-			fseek(vert, 0, SEEK_SET);
-			shader_buf = new uint8_t[shader_size];
-			fread(shader_buf, 1, shader_size, vert);
-			fclose(vert);
-
-			shader = create_shader(shader_buf, shader_size);
-			if (shader_buf)
-				delete[] shader_buf;
-		}
-
-		yyjson_read_err err;
-		yyjson_doc*     doc =
-			yyjson_read_file("res/shaders/default.spv.json", 0, nullptr, &err);
-
-		if (!doc)
-		{
-			log::error("Failed to read shader reflection: %s at %ju", err.msg, err.pos);
-			return false;
-		}
-
-		yyjson_val* root = yyjson_doc_get_root(doc);
-		yyjson_val* entry_points = yyjson_obj_get(root, "entryPoints");
-		mc::vector<VkPipelineShaderStageCreateInfo> shader_stages;
-		shader_stages.reserve(yyjson_arr_size(entry_points));
-
-		yyjson_arr_iter iter;
-		yyjson_arr_iter_init(entry_points, &iter);
-		yyjson_val* entry;
-		while ((entry = yyjson_arr_iter_next(&iter)))
-		{
-			VkPipelineShaderStageCreateInfo create_info {};
-			create_info.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-			create_info.module = shader;
-
-			yyjson_val*     stage = yyjson_obj_get(entry, "stage");
-			mc::string_view stage_str {yyjson_get_str(stage)};
-			// TODO list all possible stages
-			if (stage_str == "vertex")
-				create_info.stage = VK_SHADER_STAGE_VERTEX_BIT;
-			else if (stage_str == "fragment")
-				create_info.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-
-			yyjson_val* name = yyjson_obj_get(entry, "name");
-			create_info.pName = yyjson_get_str(name);
-			shader_stages.emplace_back(create_info);
-		}
-
-		VkVertexInputBindingDescription binding_desc = model::binding_desc();
-		mc::array<VkVertexInputAttributeDescription, 3> attribute_descs =
-			model::attribute_descs();
-
-		VkPipelineVertexInputStateCreateInfo vert_input_info {};
-		vert_input_info.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-		vert_input_info.vertexBindingDescriptionCount = 1;
-		vert_input_info.pVertexBindingDescriptions = &binding_desc;
-		vert_input_info.vertexAttributeDescriptionCount = attribute_descs.size();
-		vert_input_info.pVertexAttributeDescriptions = attribute_descs.data();
-
-		VkPipelineInputAssemblyStateCreateInfo input_assembly {};
-		input_assembly.sType =
-			VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
-		input_assembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
-		input_assembly.primitiveRestartEnable = VK_FALSE;
-
-		VkDynamicState dynamic_states[] {VK_DYNAMIC_STATE_VIEWPORT,
-		                                 VK_DYNAMIC_STATE_SCISSOR};
-
-		VkPipelineDynamicStateCreateInfo dynamic_state {};
-		dynamic_state.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
-		dynamic_state.dynamicStateCount = 2;
-		dynamic_state.pDynamicStates = dynamic_states;
-
-		// VkViewport viewport {};
-		// viewport.width = swapchain_extent_.width;
-		// viewport.height = swapchain_extent_.height;
-		// viewport.minDepth = 0.0f;
-		// viewport.maxDepth = 1.0f;
-
-		// VkRect2D scissor {};
-		// scissor.extent = swapchain_extent_;
-
-		VkPipelineViewportStateCreateInfo viewport_state {};
-		viewport_state.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
-		viewport_state.viewportCount = 1;
-		// viewport_state.pViewports = &viewport;
-		viewport_state.scissorCount = 1;
-		// viewport_state.pScissors = &scissor;
-
-		VkPipelineRasterizationStateCreateInfo rasterizer {};
-		rasterizer.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
-		rasterizer.depthClampEnable = VK_FALSE;
-		rasterizer.rasterizerDiscardEnable = VK_FALSE;
-		rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
-		rasterizer.lineWidth = 1.f;
-		rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
-		rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
-
-		VkPipelineMultisampleStateCreateInfo msaa {};
-		msaa.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
-		msaa.sampleShadingEnable = VK_FALSE;
-		msaa.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
-		msaa.minSampleShading = 1.f;
-		msaa.pSampleMask = nullptr;
-		msaa.alphaToCoverageEnable = VK_FALSE;
-		msaa.alphaToOneEnable = VK_FALSE;
-
-		VkPipelineColorBlendAttachmentState color_attachment {};
-		color_attachment.colorWriteMask =
-			VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
-			VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
-		color_attachment.blendEnable = VK_FALSE;
-		color_attachment.srcColorBlendFactor = VK_BLEND_FACTOR_ONE;
-		color_attachment.dstColorBlendFactor = VK_BLEND_FACTOR_ZERO;
-		color_attachment.colorBlendOp = VK_BLEND_OP_ADD;
-		color_attachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
-		color_attachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
-		color_attachment.alphaBlendOp = VK_BLEND_OP_ADD;
-
-		VkPipelineColorBlendStateCreateInfo color_blend {};
-		color_blend.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
-		color_blend.logicOpEnable = VK_FALSE;
-		color_blend.logicOp = VK_LOGIC_OP_COPY;
-		color_blend.attachmentCount = 1;
-		color_blend.pAttachments = &color_attachment;
-		color_blend.blendConstants[0] = 0.f;
-		color_blend.blendConstants[1] = 0.f;
-		color_blend.blendConstants[2] = 0.f;
-		color_blend.blendConstants[3] = 0.f;
-
-		VkPipelineDepthStencilStateCreateInfo depth_stencil {};
-		depth_stencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
-		depth_stencil.depthTestEnable = VK_TRUE;
-		depth_stencil.depthWriteEnable = VK_TRUE;
-		depth_stencil.depthCompareOp = VK_COMPARE_OP_LESS;
-
-		VkPushConstantRange cst_range {};
-		cst_range.size = sizeof(mat4);
-		cst_range.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-
-		VkPipelineLayoutCreateInfo pipe_layout_info {};
-		pipe_layout_info.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-		pipe_layout_info.setLayoutCount = 1;
-		pipe_layout_info.pSetLayouts = &desc_set_layout_;
-		pipe_layout_info.pushConstantRangeCount = 1;
-		pipe_layout_info.pPushConstantRanges = &cst_range;
-
-		if (vkCreatePipelineLayout(inst.get_device(), &pipe_layout_info, nullptr,
-		                           &pipe_layout_) != VK_SUCCESS)
-		{
-			vkDestroyShaderModule(inst.get_device(), shader, nullptr);
-			yyjson_doc_free(doc);
-
-			return false;
-		}
-
-		VkGraphicsPipelineCreateInfo create_info {};
-		create_info.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
-		create_info.stageCount = shader_stages.size();
-		create_info.pStages = shader_stages.data();
-		create_info.pVertexInputState = &vert_input_info;
-		create_info.pInputAssemblyState = &input_assembly;
-		create_info.pViewportState = &viewport_state;
-		create_info.pRasterizationState = &rasterizer;
-		create_info.pMultisampleState = &msaa;
-		create_info.pColorBlendState = &color_blend;
-		create_info.pDepthStencilState = &depth_stencil;
-		create_info.pDynamicState = &dynamic_state;
-		create_info.layout = pipe_layout_;
-		create_info.renderPass = nullptr;
-		create_info.subpass = 0;
-
-		VkPipelineRenderingCreateInfo rendering_info {};
-		rendering_info.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;
-		rendering_info.colorAttachmentCount = 1;
-		VkFormat format = surface_.get_format().format;
-		rendering_info.pColorAttachmentFormats = &format;
-		rendering_info.depthAttachmentFormat = VK_FORMAT_D32_SFLOAT;
-
-		create_info.pNext = &rendering_info;
-
-		VkResult res = vkCreateGraphicsPipelines(inst.get_device(), nullptr, 1,
-		                                         &create_info, nullptr, &graphics_pipe_);
-
-		vkDestroyShaderModule(inst.get_device(), shader, nullptr);
-		yyjson_doc_free(doc);
-		return res == VK_SUCCESS;
+		return mat_.create_pipeline_state();
 	}
 
 	VkShaderModule context::create_shader(uint8_t* spirv, uint32_t spirv_size)
@@ -1113,8 +911,9 @@ namespace vkb::vk
 	{
 		// TODO nvidia not coherent with spec. This will surely cause issues
 		VkDescriptorPoolSize pool_sizes[] = {
-			{VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1},
-			{VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,         1}
+			{VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,  1},
+			{VK_DESCRIPTOR_TYPE_SAMPLER,        1},
+			{VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1}
         };
 		VkDescriptorPoolCreateInfo pool_info {};
 		pool_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
@@ -1132,7 +931,8 @@ namespace vkb::vk
 		instance& inst = instance::get();
 
 		VkDescriptorSetLayout layouts[context::max_frames_in_flight] {
-			desc_set_layout_, desc_set_layout_, desc_set_layout_};
+			mat_.get_descriptor_set_layout(), mat_.get_descriptor_set_layout(),
+			mat_.get_descriptor_set_layout()};
 		VkDescriptorSetAllocateInfo alloc_info {};
 		alloc_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
 		alloc_info.descriptorPool = desc_pool_;
@@ -1156,8 +956,8 @@ namespace vkb::vk
 			img_info.imageView = obj->tex->img_view;
 			img_info.sampler = obj->tex->sampler;
 
-			VkWriteDescriptorSet write[2];
-			memset(write, 0, 2 * sizeof(VkWriteDescriptorSet));
+			VkWriteDescriptorSet write[3];
+			memset(write, 0, 3 * sizeof(VkWriteDescriptorSet));
 			write[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
 			write[0].dstSet = obj->desc_sets_[i];
 			write[0].dstBinding = 0;
@@ -1170,11 +970,19 @@ namespace vkb::vk
 			write[1].dstSet = obj->desc_sets_[i];
 			write[1].dstBinding = 1;
 			write[1].dstArrayElement = 0;
-			write[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+			write[1].descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
 			write[1].descriptorCount = 1;
 			write[1].pImageInfo = &img_info;
 
-			vkUpdateDescriptorSets(inst.get_device(), 2, write, 0, nullptr);
+			write[2].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+			write[2].dstSet = obj->desc_sets_[i];
+			write[2].dstBinding = 2;
+			write[2].dstArrayElement = 0;
+			write[2].descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER;
+			write[2].descriptorCount = 1;
+			write[2].pImageInfo = &img_info;
+
+			vkUpdateDescriptorSets(inst.get_device(), 3, write, 0, nullptr);
 		}
 
 		return true;
@@ -1182,14 +990,15 @@ namespace vkb::vk
 
 	void context::record_command_buffer(VkCommandBuffer cmd, object* obj)
 	{
-		vkCmdPushConstants(cmd, pipe_layout_, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(mat4),
-		                   &obj->trs);
+		vkCmdPushConstants(cmd, mat_.get_pipeline_layout(), VK_SHADER_STAGE_VERTEX_BIT, 0,
+		                   sizeof(mat4), &obj->trs);
 
 		VkBuffer     buffs[] {obj->model->vertex_buffer_};
 		VkDeviceSize offsets[] {0};
 		vkCmdBindVertexBuffers(cmd, 0, 1, buffs, offsets);
 		vkCmdBindIndexBuffer(cmd, obj->model->index_buffer_, 0, VK_INDEX_TYPE_UINT16);
-		vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe_layout_, 0, 1,
+		vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
+		                        mat_.get_pipeline_layout(), 0, 1,
 		                        &obj->desc_sets_[img_idx_], 0, nullptr);
 
 		vkCmdDrawIndexed(cmd, obj->model->idc_size, 1, 0, 0, 0);

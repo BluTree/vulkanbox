@@ -3,6 +3,7 @@
 #include "../math/mat4.hh"
 #include "object.hh"
 
+#include "material.hh"
 #include "surface.hh"
 
 #include <array_view.hh>
@@ -109,12 +110,13 @@ namespace vkb::vk
 
 		VkFormat surface_format_;
 
+		material     mat_;
 		VkRenderPass render_pass_ {nullptr};
 
 		VkDescriptorSetLayout desc_set_layout_ {nullptr};
 		VkPipelineLayout      pipe_layout_ {nullptr};
-		VkPipeline            graphics_pipe_ {nullptr};
-		VkPipelineCache       pipe_cache_ {VK_NULL_HANDLE};
+		// VkPipeline            graphics_pipe_ {nullptr};
+		VkPipelineCache pipe_cache_ {VK_NULL_HANDLE};
 
 		VkCommandBuffer command_buffers_[context::max_frames_in_flight] {nullptr};
 

@@ -18,13 +18,17 @@ namespace vkb::vk
 
 		bool create_pipeline_state();
 
+		VkDescriptorSetLayout get_descriptor_set_layout();
+		VkPipelineLayout      get_pipeline_layout();
+		VkPipeline            get_pipeline();
+
 	private:
 		mc::string path_;
 
 		layout layout_;
 
-		[[maybe_unused]] VkDescriptorSetLayout desc_set_layout_ {nullptr};
-		[[maybe_unused]] VkPipelineLayout      pipe_layout_ {nullptr};
-		[[maybe_unused]] VkPipeline            pipe_ {nullptr};
+		mc::vector<VkDescriptorSetLayout> desc_set_layouts_;
+		VkPipelineLayout                  pipe_layout_ {nullptr};
+		VkPipeline                        pipe_ {nullptr};
 	};
 }

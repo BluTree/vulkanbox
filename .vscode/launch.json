@@ -25,7 +25,7 @@
 			"program": "${workspaceFolder}/build/bin/slangrc.exe",
 			"args": [
 				"../res/shaders/default.slang",
-				"shaders/bin/default.spv"
+				"bin/res/shaders/default.spv"
 			],
 			"stopAtEntry": false,
 			"cwd": "${workspaceFolder}/build/",

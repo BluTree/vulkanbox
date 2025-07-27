@@ -200,7 +200,7 @@ namespace vkb::vk
 	VkSurfaceFormatKHR surface::choose_swap_format()
 	{
 		for (uint32_t i {0}; i < swapchain_support_.formats.size(); ++i)
-			if (swapchain_support_.formats[i].format == VK_FORMAT_B8G8R8_SRGB &&
+			if (swapchain_support_.formats[i].format == VK_FORMAT_B8G8R8A8_UNORM &&
 			    swapchain_support_.formats[i].colorSpace ==
 			        VK_COLOR_SPACE_SRGB_NONLINEAR_KHR)
 				return swapchain_support_.formats[i];
