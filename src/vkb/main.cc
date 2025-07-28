@@ -3,6 +3,9 @@
 #include "input/input_system.hh"
 #include "ui/context.hh"
 #include "vk/context.hh"
+#include "vk/instance.hh"
+#include "vk/material.hh"
+#include "vk/surface.hh"
 #include "win/window.hh"
 
 #include "log.hh"
@@ -24,7 +27,14 @@ int main(int argc, char** argv)
 	using namespace vkb;
 	input_system is;
 	window       main_window(&is);
-	vk::context  ctx(main_window, enable_validation);
+
+	vk::instance inst(enable_validation);
+	vk::surface  surface(main_window);
+
+	inst.create_device(surface);
+	surface.create_swapchain();
+
+	vk::context ctx(main_window, surface);
 
 	cam::free   cam(is, main_window);
 	ui::context ui_ctx(main_window, is, ctx, cam);
@@ -77,7 +87,7 @@ int main(int argc, char** argv)
 	ctx.set_proj(0.1f, 1000.f, 70.f);
 
 	mc::vector<vk::object> objs;
-	objs.reserve(10000);
+	objs.reserve(3000);
 
 	srand(0);
 

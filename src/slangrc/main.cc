@@ -49,7 +49,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char** argv)
 	}
 	Slang::ComPtr<slang::IComponentType> prog;
 	session->createCompositeComponentType(comps, entry_points + 1, prog.writeRef());
-	for (int32_t i {0}; i < entry_points + 1; ++i)
+	for (int32_t i {1}; i < entry_points + 1; ++i)
 		comps[i]->release();
 
 	Slang::ComPtr<slang::IComponentType> linkedProgram;
@@ -80,7 +80,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char** argv)
 		fwrite(spv->getBufferPointer(), 1, s, file);
 		fclose(file);
 	}
-	char* jsonFilePath = new char[strlen(argv[2] + 5 + 1)];
+	char* jsonFilePath = new char[strlen(argv[2]) + 6];
 	strcpy(jsonFilePath, argv[2]);
 	strcat(jsonFilePath, ".json");
 	file = fopen(jsonFilePath, "wb");
@@ -91,5 +91,6 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char** argv)
 	}
 	delete[] jsonFilePath;
 	delete[] comps;
+
 	return 0;
 }

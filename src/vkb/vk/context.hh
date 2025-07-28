@@ -3,6 +3,9 @@
 #include "../math/mat4.hh"
 #include "object.hh"
 
+#include "material.hh"
+#include "surface.hh"
+
 #include <array_view.hh>
 #include <string_view.hh>
 #include <vector.hh>
@@ -36,7 +39,7 @@ namespace vkb::vk
 		friend ui::context;
 
 	public:
-		context(window const& win, bool enable_validation);
+		context(window const& win, surface& surface);
 		~context();
 
 		bool created() const;
@@ -68,49 +71,8 @@ namespace vkb::vk
 		uint8_t                  cur_frame_ {0};
 		uint32_t                 img_idx_ {0};
 
-		static VKAPI_ATTR VkBool32 VKAPI_CALL debug_callback(
-			VkDebugUtilsMessageSeverityFlagBitsEXT      message_level,
-			VkDebugUtilsMessageTypeFlagsEXT             message_type,
-			VkDebugUtilsMessengerCallbackDataEXT const* callback_data, void* ud);
-
-		bool create_instance(bool enable_validation);
-		bool register_debug_callback();
-		bool check_validation_layers(mc::array_view<char const*> const& layers);
-
-		bool create_surface();
-
-		bool select_physical_device();
-
-		struct queue_families
-		{
-			uint32_t graphics = UINT32_MAX;
-			uint32_t present = UINT32_MAX;
-		};
-
-		queue_families find_queue_families(VkPhysicalDevice device);
-
-		struct swapchain_support
-		{
-			VkSurfaceCapabilitiesKHR       caps;
-			mc::vector<VkSurfaceFormatKHR> formats;
-			mc::vector<VkPresentModeKHR>   present_modes;
-		};
-
-		swapchain_support query_swapchain_support(VkPhysicalDevice device);
-
-		bool create_logical_device();
-
-		bool create_allocator();
-
-		VkSurfaceFormatKHR choose_swap_format();
-		VkPresentModeKHR   choose_swap_present_mode();
-		VkExtent2D         choose_swap_extent();
-		bool               create_swapchain();
-		bool               create_image_views();
 		bool create_image_view(VkImage& img, VkFormat format, VkImageAspectFlags flags,
 		                       uint32_t mip_lvl, VkImageView& img_view);
-
-		bool create_render_pass();
 
 		bool create_desc_set_layout();
 
@@ -118,23 +80,9 @@ namespace vkb::vk
 
 		VkShaderModule create_shader(uint8_t* spirv, uint32_t spirv_size);
 
-		bool create_framebuffers();
-
-		bool     create_command_pool();
-		bool     create_depth_resources();
-		VkFormat find_supported_format(mc::array_view<VkFormat> formats,
-		                               VkImageTiling tiling, VkFormatFeatureFlags feats);
-
 		bool create_texture_image(texture& tex, mc::string_view path);
 		bool create_texture_image_view(texture& tex);
 		bool create_texture_sampler(texture& tex);
-		bool create_image(uint32_t w, uint32_t h, uint32_t mip_lvl, VkFormat format,
-		                  VkImageTiling tiling, VkImageUsageFlags usage,
-		                  VkMemoryPropertyFlags props, VkImage& image,
-		                  VmaAllocation& mem);
-		void transition_image_layout(VkImage image, VkFormat format,
-		                             VkImageLayout old_layout, VkImageLayout new_layout,
-		                             uint32_t mip_lvl);
 		void copy_buffer_to_image(VkBuffer buffer, VkImage image, uint32_t w, uint32_t h);
 		void generate_mips(VkImage img, VkFormat format, uint32_t w, uint32_t h,
 		                   uint32_t mip_lvl);
@@ -144,12 +92,9 @@ namespace vkb::vk
 		bool create_buffer(VkDeviceSize size, VkBufferUsageFlags usage,
 		                   VkMemoryPropertyFlags props, VkBuffer& buf,
 		                   VmaAllocation& buf_mem);
-		uint32_t        find_mem_type_idx(VkMemoryPropertyFlags props);
-		VkCommandBuffer begin_commands();
-		void            end_commands(VkCommandBuffer cmd);
-		void            copy_buffer(VkBuffer src, VkBuffer dst, uint64_t size);
-		bool            create_command_buffers();
+		void copy_buffer(VkBuffer src, VkBuffer dst, uint64_t size);
 
+		void create_command_buffers();
 		bool create_sync_objects();
 
 		bool create_descriptor_pool();
@@ -160,40 +105,19 @@ namespace vkb::vk
 		void recreate_swapchain();
 
 		window const& win_;
+		surface&      surface_;
 		bool          created_ {true};
 
-		VkInstance               inst_ {nullptr};
-		VkDebugUtilsMessengerEXT debug_messenger_ {nullptr};
+		VkFormat surface_format_;
 
-		VkSurfaceKHR surface_ {nullptr};
-
-		VkPhysicalDevice  phys_device_ {nullptr};
-		queue_families    queue_families_;
-		swapchain_support swapchain_support_;
-		VkDevice          device_ {nullptr};
-
-		// Should be VmaAllocator* but void* to prevent vma inclusion in header
-		VmaAllocator allocator_ {nullptr};
-
-		VkQueue graphics_queue_ {nullptr};
-		VkQueue present_queue_ {nullptr};
-
-		VkSwapchainKHR          swapchain_;
-		VkSurfaceFormatKHR      swapchain_format_;
-		VkExtent2D              swapchain_extent_;
-		mc::vector<VkImage>     swapchain_images_;
-		mc::vector<VkImageView> swapchain_image_views_;
-
+		material     mat_;
 		VkRenderPass render_pass_ {nullptr};
 
 		VkDescriptorSetLayout desc_set_layout_ {nullptr};
 		VkPipelineLayout      pipe_layout_ {nullptr};
-		VkPipeline            graphics_pipe_ {nullptr};
-		VkPipelineCache       pipe_cache_ {VK_NULL_HANDLE};
+		// VkPipeline            graphics_pipe_ {nullptr};
+		VkPipelineCache pipe_cache_ {VK_NULL_HANDLE};
 
-		mc::vector<VkFramebuffer> framebuffers_;
-
-		VkCommandPool   command_pool_ {nullptr};
 		VkCommandBuffer command_buffers_[context::max_frames_in_flight] {nullptr};
 
 		mc::vector<VkSemaphore> recycled_semaphores_;

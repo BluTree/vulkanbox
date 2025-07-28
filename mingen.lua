@@ -29,6 +29,8 @@ if (mg.platform() == 'windows') then
 		'-D"_CRT_SECURE_NO_WARNINGS"',
 		'-D"_MT"',
 		'-D"_DLL"',
+		'-D_DISABLE_STRING_ANNOTATION',
+		'-D_DISABLE_VECTOR_ANNOTATION',
 	}
 elseif (mg.platform() == 'linux') then
 	platform_define = {'-D"VKB_LINUX"'}
@@ -48,7 +50,9 @@ if (mg.platform() == 'windows') then
 	platform_link_options = {
 		'-Xlinker /incremental:no',
 		'-Xlinker /nodefaultlib:libcmt.lib',
-		'-lmsvcrt.lib'
+		'-Xlinker /defaultlib:msvcrt.lib',
+		-- '-lclang_rt.asan_dynamic_runtime_thunk-x86_64.lib',
+		-- '-lclang_rt.asan_dynamic-x86_64.lib',
 	}
 end
 
@@ -79,7 +83,7 @@ local vkb = mg.project({
 	sources = {'src/vkb/**.cc'},
 	includes = include_dirs,
 	compile_options = merge('-g', '-std=c++20', '-Wall', '-Wextra', '-Werror', platform_define, platform_compile_options),
-	link_options = merge('-g', platform_link_options),
+	link_options = merge(platform_link_options, '-g', '-fuse-ld=lld-link'),
 	dependencies = merge(imgui.project, vulkan.project, mincore.project, yyjson.project, platform_deps),
 	release = {
 		compile_options = {'-O2'}

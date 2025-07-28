@@ -14,7 +14,8 @@ struct camera
 struct set_0
 {
 	camera cam;
-	Sampler2D tex;
+	Texture2D tex;
+	SamplerState sampler;
 };
 
 ParameterBlock<set_0> set0;
@@ -41,7 +42,7 @@ vertex_out v_main(vertex in, uniform float4x4 model)
 [shader("fragment")]
 float4 f_main(vertex_out in) : SV_Target
 {
-	float4 col = set0.tex.Sample(in.uv*4) * in.col;
+	float4 col = set0.tex.Sample(set0.sampler, in.uv*4) * in.col;
 
 	return col;
 }
