@@ -33,7 +33,6 @@ namespace vkb::vk
 	{
 		auto [w, h] = win_.size();
 		proj_ = mat4::persp_proj(near_, far_, w / (float)h, rad(fov_deg_));
-		view_ = mat4::look_at({0.f, -2.f, 2.f, 1.f}, vec4(), {0.f, 0.f, 1.f, 1.f});
 
 		created_ = create_desc_set_layout();
 		if (!created_)
@@ -231,7 +230,7 @@ namespace vkb::vk
 		vkFreeDescriptorSets(inst.get_device(), desc_pool_, 2, obj->desc_sets_);
 	}
 
-	void context::begin_draw(cam::free& cam)
+	void context::prepare_draw(cam::free& cam)
 	{
 		instance& inst = instance::get();
 
@@ -324,7 +323,10 @@ namespace vkb::vk
 			VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,            // srcStage
 			VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT // dstStage
 		);
+	}
 
+	void context::begin_draw()
+	{
 		VkRenderingAttachmentInfo color_attachment {};
 		color_attachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
 		color_attachment.imageView = surface_.get_image_views()[img_idx_];
@@ -438,7 +440,7 @@ namespace vkb::vk
 		init_info.Queue = inst.get_graphics_queue();
 		init_info.PipelineCache = pipe_cache_;
 		init_info.DescriptorPool = desc_pool_;
-		init_info.RenderPass = nullptr;
+		init_info.PipelineInfoMain.RenderPass = nullptr;
 		init_info.UseDynamicRendering = true;
 
 		VkPipelineRenderingCreateInfo rendering_info {};
@@ -448,11 +450,11 @@ namespace vkb::vk
 		rendering_info.pColorAttachmentFormats = &surface_format_;
 		rendering_info.depthAttachmentFormat = VK_FORMAT_D32_SFLOAT;
 
-		init_info.PipelineRenderingCreateInfo = rendering_info;
-		init_info.Subpass = 0;
+		init_info.PipelineInfoMain.PipelineRenderingCreateInfo = rendering_info;
+		init_info.PipelineInfoMain.Subpass = 0;
 		init_info.MinImageCount = context::max_frames_in_flight;
 		init_info.ImageCount = context::max_frames_in_flight;
-		init_info.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
+		init_info.PipelineInfoMain.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
 		init_info.Allocator = nullptr;
 	}
 
@@ -461,10 +463,20 @@ namespace vkb::vk
 		return command_buffers_[img_idx_];
 	}
 
+	uint32_t context::current_img_idx()
+	{
+		return img_idx_;
+	}
+
 	void context::wait_completion()
 	{
 		instance& inst = instance::get();
 		vkDeviceWaitIdle(inst.get_device());
+	}
+
+	mat4 context::get_proj()
+	{
+		return proj_;
 	}
 
 	bool context::create_image_view(VkImage& img, VkFormat format,
@@ -911,15 +923,17 @@ namespace vkb::vk
 	{
 		// TODO nvidia not coherent with spec. This will surely cause issues
 		VkDescriptorPoolSize pool_sizes[] = {
-			{VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,  1},
-			{VK_DESCRIPTOR_TYPE_SAMPLER,        1},
-			{VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1}
+			{VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,          10001},
+			{VK_DESCRIPTOR_TYPE_SAMPLER,                10001},
+			{VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,         10001},
+			{VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1    }
         };
 		VkDescriptorPoolCreateInfo pool_info {};
 		pool_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
 		pool_info.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
 		pool_info.maxSets = context::max_frames_in_flight * 10001;
 		pool_info.pPoolSizes = pool_sizes;
+		pool_info.poolSizeCount = 4;
 		VkResult res = vkCreateDescriptorPool(instance::get().get_device(), &pool_info,
 		                                      nullptr, &desc_pool_);
 

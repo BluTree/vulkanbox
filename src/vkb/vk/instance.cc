@@ -5,6 +5,7 @@
 #include <string_view.hh>
 #include <vector.hh>
 
+#include "enum_string_helper.hh"
 #include "surface.hh"
 
 namespace vkb::vk
@@ -172,11 +173,14 @@ namespace vkb::vk
 
 		VmaAllocationCreateInfo alloc_info {};
 
-		/*VkPhysicalDeviceMemoryProperties const* mem_props;
+		VkPhysicalDeviceMemoryProperties const* mem_props;
 		vmaGetMemoryProperties(allocator_, &mem_props);
 		for (uint32_t i {0}; i < mem_props->memoryTypeCount; ++i)
-		    if ((mem_props->memoryTypes[i].propertyFlags & props) == props)
-		        alloc_info.memoryTypeBits = 1 << i;*/
+			if ((mem_props->memoryTypes[i].propertyFlags & props) == props)
+			{
+				alloc_info.memoryTypeBits = 1 << i;
+				break;
+			}
 
 		image    result {};
 		VkResult res = vmaCreateImage(allocator_, &img_info, &alloc_info, &result.image,
@@ -207,7 +211,8 @@ namespace vkb::vk
 
 		VkImageView img_view {nullptr};
 		VkResult    res = vkCreateImageView(device_, &create_info, nullptr, &img_view);
-		log::assert(res == VK_SUCCESS, "Failed to create image view");
+		log::assert(res == VK_SUCCESS, "Failed to create image view (%s)",
+		            string_VkResult(res));
 
 		return img_view;
 	}
@@ -236,6 +241,38 @@ namespace vkb::vk
 
 		vkCmdPipelineBarrier(cmd, src_stage, dst_stage, 0, 0, nullptr, 0, nullptr, 1,
 		                     &barrier);
+	}
+
+	buffer instance::create_buffer(VkDeviceSize size, VkBufferUsageFlags usage,
+	                               VkMemoryPropertyFlags props)
+	{
+		VkBufferCreateInfo create_info {};
+		create_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+		create_info.size = size;
+		create_info.usage = usage;
+		create_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+		VmaAllocationCreateInfo                 alloc_info {};
+		VkPhysicalDeviceMemoryProperties const* mem_props;
+		vmaGetMemoryProperties(allocator_, &mem_props);
+		for (uint32_t i {0}; i < mem_props->memoryTypeCount; ++i)
+			if ((mem_props->memoryTypes[i].propertyFlags & props) == props)
+			{
+				alloc_info.memoryTypeBits = 1 << i;
+				break;
+			}
+
+		buffer   result {};
+		VkResult res = vmaCreateBuffer(allocator_, &create_info, &alloc_info,
+		                               &result.buffer, &result.memory, nullptr);
+		log::assert(res == VK_SUCCESS, "Failed to create buffer (%s)",
+		            string_VkResult(res));
+		return result;
+	}
+
+	void instance::destroy_buffer(buffer const& buf)
+	{
+		vmaDestroyBuffer(allocator_, buf.buffer, buf.memory);
 	}
 
 	VkCommandBuffer instance::begin_commands(/*bool transient*/)

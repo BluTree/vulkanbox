@@ -58,10 +58,16 @@ namespace vkb::cam
 		pos_ += rot_.rotate(vel * vel_modifier);
 	}
 
-	mat4 free::view_mat()
+	mat4 free::view_mat() const
 	{
 		// +90 to pitch, to turn the z axis to up axis, and y axis to front axis
 		return mat4::translate(-pos_) * mat4::rotate({0.f, 0.f, 1.f, 1.f}, rad(-yaw_)) *
+		       mat4::rotate({1.f, 0.f, 0.f, 1.f}, rad(-pitch_ + 90));
+	}
+
+	mat4 free::rot_mat() const
+	{
+		return mat4::rotate({0.f, 0.f, 1.f, 1.f}, rad(-yaw_)) *
 		       mat4::rotate({1.f, 0.f, 0.f, 1.f}, rad(-pitch_ + 90));
 	}
 }

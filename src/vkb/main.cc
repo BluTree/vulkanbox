@@ -5,6 +5,7 @@
 #include "vk/context.hh"
 #include "vk/instance.hh"
 #include "vk/material.hh"
+#include "vk/material/sky_sphere.hh"
 #include "vk/surface.hh"
 #include "win/window.hh"
 
@@ -38,6 +39,8 @@ int main(int argc, char** argv)
 
 	cam::free   cam(is, main_window);
 	ui::context ui_ctx(main_window, is, ctx, cam);
+
+	vk::sky_sphere sky;
 
 	bool running {ctx.created()};
 	// vkb::log::assert(running, "Failed to initialize Vulkan context");
@@ -132,7 +135,12 @@ int main(int argc, char** argv)
 		if (!main_window.closed() && !main_window.minimized())
 		{
 			ui_ctx.update(dt);
-			ctx.begin_draw(cam);
+			ctx.prepare_draw(cam);
+			sky.prepare_draw(ctx.current_command_buffer(), ctx.current_img_idx(), cam,
+			                 ctx.get_proj());
+
+			ctx.begin_draw();
+			sky.draw(ctx.current_command_buffer(), ctx.current_img_idx());
 			ctx.draw();
 			ui_ctx.draw();
 			ctx.present();

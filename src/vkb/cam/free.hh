@@ -26,7 +26,8 @@ namespace vkb::cam
 
 		void update(double dt);
 
-		mat4 view_mat();
+		mat4 view_mat() const;
+		mat4 rot_mat() const;
 
 	private:
 		input_system& is_;

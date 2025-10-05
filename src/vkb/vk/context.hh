@@ -56,15 +56,19 @@ namespace vkb::vk
 		bool init_object(object* obj);
 		void destroy_object(object* obj);
 
-		void begin_draw(cam::free& cam);
+		void prepare_draw(cam::free& cam);
+		void begin_draw();
 		void draw();
 		void present();
 
 		void fill_init_info(ImGui_ImplVulkan_InitInfo& init_info);
 
 		VkCommandBuffer current_command_buffer();
+		uint32_t        current_img_idx();
 
 		void wait_completion();
+
+		mat4 get_proj();
 
 	private:
 		constexpr static uint8_t max_frames_in_flight {3};
@@ -133,7 +137,6 @@ namespace vkb::vk
 		VkBuffer      uniform_buffers_[context::max_frames_in_flight] {nullptr};
 		VmaAllocation uniform_buffers_memory_[context::max_frames_in_flight] {nullptr};
 
-		mat4  view_;
 		mat4  proj_;
 		float near_ {0.1f};
 		float far_ {100.f};

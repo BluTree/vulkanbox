@@ -2,6 +2,8 @@
 
 namespace vkb
 {
+	class mat4;
+
 	struct vec4
 	{
 		vec4  operator+(vec4 rhs) const;
@@ -15,6 +17,8 @@ namespace vkb
 		vec4  operator-(float rhs) const;
 		vec4& operator-=(float rhs);
 
+		vec4  operator*(mat4 const& rhs) const;
+		vec4& operator*=(mat4 const& rhs);
 		vec4  operator*(vec4 rhs) const;
 		vec4& operator*=(vec4 rhs);
 		vec4  operator*(float rhs) const;

@@ -25,7 +25,6 @@ namespace vkb
 		static mat4 persp_proj(float near, float far, float asp_ratio, float fov,
 		                       fov_axis axis = fov_axis::y);
 		static mat4 ortho_proj(float near, float far, float l, float r, float t, float b);
-		static mat4 look_at(vec4 eye, vec4 at, vec4 up);
 
 		mat4();
 		mat4(float arr[4][4]);
@@ -35,7 +34,7 @@ namespace vkb
 		float*       operator[](uint8_t i) &;
 		float const* operator[](uint8_t i) const&;
 
-		mat4 operator*(mat4 const& other);
+		mat4 operator*(mat4 const& other) const;
 
 		mat4 transpose() const;
 

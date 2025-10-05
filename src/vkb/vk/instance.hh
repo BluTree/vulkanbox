@@ -6,6 +6,7 @@
 #include "vma/vma.hh"
 #include <vulkan/vulkan.h>
 
+#include "buffer.hh"
 #include "image.hh"
 
 namespace vkb::vk
@@ -61,6 +62,10 @@ namespace vkb::vk
 			VkAccessFlags dst_access_mask, VkPipelineStageFlags src_stage,
 			VkPipelineStageFlags dst_stage,
 			VkImageAspectFlags aspect = VK_IMAGE_ASPECT_COLOR_BIT, uint32_t mip_lvl = 1);
+
+		buffer create_buffer(VkDeviceSize size, VkBufferUsageFlags usage,
+		                     VkMemoryPropertyFlags props);
+		void   destroy_buffer(buffer const& buf);
 
 		VkCommandBuffer begin_commands();
 		void            end_commands(VkCommandBuffer cmd);

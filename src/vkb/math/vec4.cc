@@ -1,5 +1,7 @@
 #include "vec4.hh"
 
+#include "mat4.hh"
+
 #include <math.h>
 
 namespace vkb
@@ -65,6 +67,26 @@ namespace vkb
 		y -= rhs;
 		z -= rhs;
 		w -= rhs;
+
+		return *this;
+	}
+
+	vec4 vec4::operator*(mat4 const& rhs) const
+	{
+		return {
+			x * (rhs[0][0]) + y * (rhs[1][0]) + z * (rhs[2][0]) + w * (rhs[3][0]),
+			x * (rhs[0][1]) + y * (rhs[1][1]) + z * (rhs[2][1]) + w * (rhs[3][1]),
+			x * (rhs[0][2]) + y * (rhs[1][2]) + z * (rhs[2][2]) + w * (rhs[3][2]),
+			x * (rhs[0][3]) + y * (rhs[1][3]) + z * (rhs[2][3]) + w * (rhs[3][3]),
+		};
+	}
+
+	vec4& vec4::operator*=(mat4 const& rhs)
+	{
+		x = x * (rhs[0][0]) + y * (rhs[1][0]) + z * (rhs[2][0]) + w * (rhs[3][0]);
+		y = x * (rhs[0][1]) + y * (rhs[1][1]) + z * (rhs[2][1]) + w * (rhs[3][1]);
+		z = x * (rhs[0][2]) + y * (rhs[1][2]) + z * (rhs[2][2]) + w * (rhs[3][2]);
+		w = x * (rhs[0][3]) + y * (rhs[1][3]) + z * (rhs[2][3]) + w * (rhs[3][3]);
 
 		return *this;
 	}

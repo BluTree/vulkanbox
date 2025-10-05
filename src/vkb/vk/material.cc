@@ -379,6 +379,7 @@ namespace vkb::vk
 				VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
 			shader_stages_info[i].pNext = nullptr;
 			shader_stages_info[i].flags = 0;
+			shader_stages_info[i].pSpecializationInfo = nullptr;
 			shader_stages_info[i].module = shader;
 			shader_stages_info[i].pName = layout_.entry_points[i].name.data();
 

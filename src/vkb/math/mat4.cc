@@ -1,5 +1,7 @@
 #include "mat4.hh"
 
+#include "vec4.hh"
+
 #include <math.h>
 #include <string.h>
 
@@ -109,22 +111,6 @@ namespace vkb
 		// clang-format on
 	}
 
-	mat4 mat4::look_at(vec4 eye, vec4 at, vec4 up)
-	{
-		vec4 z = (at - eye).norm3();
-		vec4 x = z.cross3(up).norm3();
-		vec4 y = x.cross3(z);
-
-		// clang-format off
-		return {
-			x.x,  y.x,  -z.x,  0.f,
-			x.y,  y.y,  -z.y,  0.f,
-			x.z, y.z, -z.z, 0.f,
-			-x.dot3(eye), -y.dot3(eye), z.dot3(eye), 1.f
-		};
-		// clang-format on
-	}
-
 	mat4::mat4()
 	{
 		memset(arr_, 0, 16 * sizeof(float));
@@ -155,7 +141,7 @@ namespace vkb
 		return arr_[i];
 	}
 
-	mat4 mat4::operator*(mat4 const& other)
+	mat4 mat4::operator*(mat4 const& other) const
 	{
 		mat4 res;
 
