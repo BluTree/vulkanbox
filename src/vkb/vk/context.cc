@@ -331,7 +331,7 @@ namespace vkb::vk
 		color_attachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
 		color_attachment.imageView = surface_.get_image_views()[img_idx_];
 		color_attachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-		color_attachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+		color_attachment.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
 		color_attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
 
 		VkRenderingAttachmentInfo depth_attachment {};
