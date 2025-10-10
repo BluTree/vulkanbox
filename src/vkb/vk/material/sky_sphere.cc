@@ -2,6 +2,7 @@
 
 #include "../../log.hh"
 #include "../../math/mat4.hh"
+#include "../../math/math.hh"
 #include "../../sphere.hh"
 #include "../enum_string_helper.hh"
 #include "../instance.hh"
@@ -35,14 +36,20 @@ namespace vkb::vk
 			log::assert(res == VK_SUCCESS, "Failed to create descriptor set layout (%s)",
 			            string_VkResult(res));
 
+			binding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+			res = vkCreateDescriptorSetLayout(inst.get_device(), &layout_info, nullptr,
+			                                  &star_positions_layout_);
+			log::assert(res == VK_SUCCESS, "Failed to create descriptor set layout (%s)",
+			            string_VkResult(res));
+
 			VkDescriptorPoolSize pool_sizes[] = {
-				{VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 3}
+				{VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 4}
             };
 
 			VkDescriptorPoolCreateInfo pool_info {};
 			pool_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
 			pool_info.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
-			pool_info.maxSets = 3;
+			pool_info.maxSets = 4;
 			pool_info.pPoolSizes = pool_sizes;
 			pool_info.poolSizeCount = 1;
 			res = vkCreateDescriptorPool(instance::get().get_device(), &pool_info,
@@ -50,20 +57,21 @@ namespace vkb::vk
 			log::assert(res == VK_SUCCESS, "Failed to create descriptor pool (%s)",
 			            string_VkResult(res));
 
-			VkDescriptorSetLayout       layouts[3] {desc_set_layout_, desc_set_layout_,
-			                                        desc_set_layout_};
+			VkDescriptorSetLayout       layouts[4] {desc_set_layout_, desc_set_layout_,
+			                                        desc_set_layout_, star_positions_layout_};
 			VkDescriptorSetAllocateInfo alloc_info {};
 			alloc_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
 			alloc_info.descriptorPool = desc_pool_;
-			alloc_info.descriptorSetCount = 3;
+			alloc_info.descriptorSetCount = 4;
 			alloc_info.pSetLayouts = layouts;
-			res = vkAllocateDescriptorSets(inst.get_device(), &alloc_info, desc_sets_);
+			VkDescriptorSet sets[4];
+			res = vkAllocateDescriptorSets(inst.get_device(), &alloc_info, sets);
 			log::assert(res == VK_SUCCESS, "Failed to create descriptor sets (%s)",
 			            string_VkResult(res));
 
-			// VkWriteDescriptorSet write[3] {};
 			for (uint32_t i {0}; i < 3; ++i)
 			{
+				desc_sets_[i] = sets[i];
 				staging_uniforms_[i] =
 					inst.create_buffer(sizeof(mat4), VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
 				                       VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
@@ -79,7 +87,7 @@ namespace vkb::vk
 				buf_info.offset = 0;
 				buf_info.range = sizeof(mat4);
 
-				VkWriteDescriptorSet write;
+				VkWriteDescriptorSet write {};
 				write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
 				write.dstSet = desc_sets_[i];
 				write.dstBinding = 0;
@@ -89,14 +97,73 @@ namespace vkb::vk
 				write.pBufferInfo = &buf_info;
 				vkUpdateDescriptorSets(inst.get_device(), 1, &write, 0, nullptr);
 			}
+
+			star_positions_set_ = sets[3];
+			constexpr uint32_t star_count = 1000;
+
+			buffer staging = inst.create_buffer(sizeof(star) * star_count,
+			                                    VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+			                                    VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+			                                        VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+
+			star_positions_uniform_ = inst.create_buffer(
+				sizeof(star) * star_count,
+				VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+				VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+
+			VkDescriptorBufferInfo buf_info {};
+			buf_info.buffer = star_positions_uniform_.buffer;
+			buf_info.offset = 0;
+			buf_info.range = sizeof(star) * star_count;
+
+			VkWriteDescriptorSet write {};
+			write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+			write.dstSet = star_positions_set_;
+			write.dstBinding = 0;
+			write.dstArrayElement = 0;
+			write.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+			write.descriptorCount = 1;
+			write.pBufferInfo = &buf_info;
+			vkUpdateDescriptorSets(inst.get_device(), 1, &write, 0, nullptr);
+
+			star stars[star_count];
+			for (uint32_t i {0}; i < star_count; ++i)
+			{
+				stars[i].pos = math::generate_sphere_point();
+
+				stars[i].intensity = math::rand() * 0.8 + 0.2;
+			}
+
+			void* buf_mem;
+			vmaMapMemory(inst.get_allocator(), staging.memory, &buf_mem);
+			memcpy(buf_mem, stars, sizeof(stars));
+			vmaUnmapMemory(inst.get_allocator(), staging.memory);
+
+			VkCommandBuffer cmd = inst.begin_commands();
+
+			VkBufferCopy2 region {};
+			region.sType = VK_STRUCTURE_TYPE_BUFFER_COPY_2;
+			region.size = sizeof(stars);
+			VkCopyBufferInfo2 copy {};
+			copy.sType = VK_STRUCTURE_TYPE_COPY_BUFFER_INFO_2;
+			copy.srcBuffer = staging.buffer;
+			copy.dstBuffer = star_positions_uniform_.buffer;
+			copy.regionCount = 1;
+			copy.pRegions = &region;
+			vkCmdCopyBuffer2(cmd, &copy);
+
+			inst.end_commands(cmd);
+
+			inst.destroy_buffer(staging);
 		}
 
 		// Pipeline
 		{
+			VkDescriptorSetLayout layouts[] {desc_set_layout_, star_positions_layout_};
 			VkPipelineLayoutCreateInfo pipe_layout_info {};
 			pipe_layout_info.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-			pipe_layout_info.setLayoutCount = 1;
-			pipe_layout_info.pSetLayouts = &desc_set_layout_;
+			pipe_layout_info.setLayoutCount = 2;
+			pipe_layout_info.pSetLayouts = layouts;
 
 			res = vkCreatePipelineLayout(inst.get_device(), &pipe_layout_info, nullptr,
 			                             &pipe_layout_);
@@ -247,6 +314,8 @@ namespace vkb::vk
 			                                nullptr, &pipe_);
 			log::assert(res == VK_SUCCESS, "Failed to create graphics pipeline (%s)",
 			            string_VkResult(res));
+
+			vkDestroyShaderModule(inst.get_device(), shader, nullptr);
 		}
 
 		// Model
@@ -314,6 +383,8 @@ namespace vkb::vk
 		vkDestroyPipeline(inst.get_device(), pipe_, nullptr);
 		vkDestroyPipelineLayout(inst.get_device(), pipe_layout_, nullptr);
 
+		inst.destroy_buffer(star_positions_uniform_);
+
 		for (uint32_t i {0}; i < 3; ++i)
 		{
 			inst.destroy_buffer(staging_uniforms_[i]);
@@ -321,6 +392,7 @@ namespace vkb::vk
 		}
 
 		vkDestroyDescriptorPool(inst.get_device(), desc_pool_, nullptr);
+		vkDestroyDescriptorSetLayout(inst.get_device(), star_positions_layout_, nullptr);
 		vkDestroyDescriptorSetLayout(inst.get_device(), desc_set_layout_, nullptr);
 	}
 
@@ -364,13 +436,23 @@ namespace vkb::vk
 		vkCmdBindVertexBuffers(cmd, 0, 1, &vertices_.buffer, &offset);
 		vkCmdBindIndexBuffer(cmd, indices_.buffer, 0, VK_INDEX_TYPE_UINT16);
 
+		VkDescriptorSet sets[2] {desc_sets_[img_idx], star_positions_set_};
+
 		VkBindDescriptorSetsInfo set_info {};
 		set_info.sType = VK_STRUCTURE_TYPE_BIND_DESCRIPTOR_SETS_INFO;
-		set_info.descriptorSetCount = 1;
-		set_info.pDescriptorSets = &desc_sets_[img_idx];
+		set_info.descriptorSetCount = 2;
+		set_info.pDescriptorSets = sets;
 		set_info.layout = pipe_layout_;
-		set_info.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+		set_info.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
 		vkCmdBindDescriptorSets2(cmd, &set_info);
+
+		// VkBindDescriptorSetsInfo star_info {};
+		// star_info.sType = VK_STRUCTURE_TYPE_BIND_DESCRIPTOR_SETS_INFO;
+		// star_info.descriptorSetCount = 1;
+		// star_info.pDescriptorSets = &star_positions_set_;
+		// star_info.layout = pipe_layout_;
+		// star_info.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+		// vkCmdBindDescriptorSets2(cmd, &star_info);
 
 		vkCmdDrawIndexed(cmd, sizeof(sphere_indices) / sizeof(uint16_t), 1, 0, 0, 0);
 	}

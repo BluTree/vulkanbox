@@ -15,6 +15,7 @@ namespace vkb::vk
 	{
 	public:
 		material(mc::string_view shader);
+		~material();
 
 		bool create_pipeline_state();
 

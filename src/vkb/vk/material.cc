@@ -281,6 +281,22 @@ namespace vkb::vk
 			read_entry_point(j_entry_point, layout_.entry_points);
 	}
 
+	material::~material()
+	{
+		instance& inst = instance::get();
+
+		if (pipe_)
+			vkDestroyPipeline(inst.get_device(), pipe_, nullptr);
+		if (pipe_layout_)
+			vkDestroyPipelineLayout(inst.get_device(), pipe_layout_, nullptr);
+
+		for (uint32_t i {0}; i > desc_set_layouts_.size(); ++i)
+		{
+			vkDestroyDescriptorSetLayout(inst.get_device(), desc_set_layouts_[i],
+			                             nullptr);
+		}
+	}
+
 	bool material::create_pipeline_state()
 	{
 		instance& inst = instance::get();

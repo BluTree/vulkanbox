@@ -10,6 +10,7 @@
 #include "win/window.hh"
 
 #include "log.hh"
+#include "math/math.hh"
 #include "math/trig.hh"
 
 #include <math.h>
@@ -26,6 +27,9 @@ int main(int argc, char** argv)
 	if (argc > 1)
 		enable_validation = strcmp(argv[1], "--validate") == 0;
 	using namespace vkb;
+
+	math::init_random();
+
 	input_system is;
 	window       main_window(&is);
 
@@ -90,7 +94,7 @@ int main(int argc, char** argv)
 	ctx.set_proj(0.1f, 1000.f, 70.f);
 
 	mc::vector<vk::object> objs;
-	objs.reserve(3000);
+	objs.reserve(1);
 
 	srand(0);
 

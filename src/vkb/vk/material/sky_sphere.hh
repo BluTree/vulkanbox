@@ -23,11 +23,22 @@ namespace vkb::vk
 		void draw(VkCommandBuffer cmd, uint32_t const img_idx);
 
 	private:
+		struct alignas(16) star
+		{
+			vec4  pos;
+			float intensity {0};
+		};
+
 		VkDescriptorSetLayout desc_set_layout_ {nullptr};
-		VkDescriptorPool      desc_pool_ {nullptr};
-		VkDescriptorSet       desc_sets_[3] {nullptr};
-		buffer                staging_uniforms_[3];
-		buffer                uniforms_[3];
+
+		VkDescriptorPool desc_pool_ {nullptr};
+		VkDescriptorSet  desc_sets_[3] {nullptr};
+		buffer           staging_uniforms_[3];
+		buffer           uniforms_[3];
+
+		VkDescriptorSetLayout star_positions_layout_ {nullptr};
+		VkDescriptorSet       star_positions_set_ {nullptr};
+		buffer                star_positions_uniform_;
 
 		VkPipelineLayout pipe_layout_ {nullptr};
 		VkPipeline       pipe_ {nullptr};
