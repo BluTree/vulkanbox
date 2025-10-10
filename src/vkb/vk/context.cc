@@ -116,6 +116,8 @@ namespace vkb::vk
 		for (uint32_t i {0}; i < recycled_semaphores_.size(); ++i)
 			vkDestroySemaphore(inst.get_device(), recycled_semaphores_[i], nullptr);
 
+		if (desc_set_layout_)
+			vkDestroyDescriptorSetLayout(inst.get_device(), desc_set_layout_, nullptr);
 		if (pipe_layout_)
 			vkDestroyPipelineLayout(inst.get_device(), pipe_layout_, nullptr);
 		if (desc_set_layout_)
