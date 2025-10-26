@@ -7,11 +7,13 @@
 #include "../win/window.hh"
 
 #include <imgui/backends/imgui_impl_vulkan.h>
+#ifdef VKB_WINDOWS
+#include <vulkan/vulkan_win32.h>
 #include <win32/misc.h>
+#endif
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb/stb_image.h>
 
-#include <vulkan/vulkan_win32.h>
 #include <yyjson.h>
 
 #ifdef VKB_WINDOWS

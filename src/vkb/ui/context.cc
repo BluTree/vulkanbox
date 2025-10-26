@@ -12,13 +12,19 @@
 #include <imgui/backends/imgui_impl_win32.h>
 #include <imgui/imgui.h>
 
+#ifdef VKB_WINDOWS
 #include "vulkan/vulkan_win32.h"
 #include "win32/misc.h"
+#endif
+
+// TODO ImGui currently doesn't have any "platform level" backend for linux (gtk,kde)
+// A custom backend will be needed, and will eventually replace the win32 backend as well.
 
 namespace vkb::ui
 {
 	namespace
 	{
+#ifdef VKB_WINDOWS
 		static int ImGui_ImplWin32_CreateVkSurface(ImGuiViewport* viewport,
 		                                           ImU64          vk_instance,
 		                                           void const*    vk_allocator,
@@ -32,6 +38,7 @@ namespace vkb::ui
 			                                    (VkAllocationCallbacks*)vk_allocator,
 			                                    (VkSurfaceKHR*)out_vk_surface);
 		}
+#endif
 	}
 
 	context::context(window& win, input_system& is, vk::context& vk, cam::free& cam)
@@ -40,6 +47,7 @@ namespace vkb::ui
 	, vk_ {vk}
 	, cam_ {cam}
 	{
+#ifdef VKB_WINDOWS
 		ImGui::CreateContext();
 		ImGuiIO& io = ImGui::GetIO();
 		io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
@@ -50,17 +58,21 @@ namespace vkb::ui
 		ImGui_ImplVulkan_InitInfo init_info {};
 		vk_.fill_init_info(init_info);
 		ImGui_ImplVulkan_Init(&init_info);
+#endif
 	}
 
 	context::~context()
 	{
+#ifdef VKB_WINDOWS
 		ImGui_ImplVulkan_Shutdown();
 		ImGui_ImplWin32_Shutdown();
 		ImGui::DestroyContext();
+#endif
 	}
 
-	void context::update(double dt)
+	void context::update([[maybe_unused]] double dt)
 	{
+#ifdef VKB_WINDOWS
 		ImGui_ImplVulkan_NewFrame();
 		ImGui_ImplWin32_NewFrame();
 		ImGui::NewFrame();
@@ -152,13 +164,16 @@ namespace vkb::ui
 
 		    ImGui::End();
 		}*/
+#endif
 	}
 
 	void context::draw()
 	{
+#ifdef VKB_WINDOWS
 		ImGui::Render();
 
 		ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(),
 		                                vk_.current_command_buffer());
+#endif
 	}
 }

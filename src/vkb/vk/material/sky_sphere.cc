@@ -172,13 +172,13 @@ namespace vkb::vk
 
 			VkShaderModule shader;
 			uint32_t*      shader_buf {nullptr};
-			int64_t        shader_size {0};
+			uint32_t       shader_size {0};
 			FILE*          shader_file {fopen("res/shaders/sky_sphere.spv", "rb")};
 
 			log::assert(shader_file, "Failed to open sky_sphere.spv");
 
 			fseek(shader_file, 0, SEEK_END);
-			fgetpos(shader_file, &shader_size);
+			shader_size = ftell(shader_file);
 
 			fseek(shader_file, 0, SEEK_SET);
 			shader_buf = new uint32_t[shader_size / 4];

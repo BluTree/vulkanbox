@@ -35,10 +35,10 @@ namespace vkb::ui
 		[[maybe_unused]] vk::context&  vk_;
 		[[maybe_unused]] cam::free&    cam_;
 
-		bool demo_ {false};
+		[[maybe_unused]] bool demo_ {false};
 
-		double   refresh {0.0};
-		uint32_t fps {0};
-		uint32_t disp_fps {0};
+		[[maybe_unused]] double   refresh {0.0};
+		[[maybe_unused]] uint32_t fps {0};
+		[[maybe_unused]] uint32_t disp_fps {0};
 	};
 }

@@ -13,7 +13,7 @@ end
 local slang = mg.project({
 	name = 'slang',
 	type = mg.project_type.prebuilt,
-	static_libraries = {'slang.lib'},
+	static_libraries = {'slang'},
 	static_library_directories = {slang_dir .. 'lib/'}
 })
 

@@ -420,7 +420,12 @@ namespace vkb::vk
 		create_info.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
 		create_info.pApplicationInfo = &app_info;
 
-		char const* required_exts[] {"VK_KHR_surface", "VK_KHR_win32_surface",
+		char const* required_exts[] {"VK_KHR_surface",
+#ifdef VKB_WINDOWS
+		                             "VK_KHR_win32_surface",
+#elif defined(VKB_LINUX)
+		                             "VK_KHR_wayland_surface",
+#endif
 		                             VK_EXT_DEBUG_UTILS_EXTENSION_NAME};
 		create_info.ppEnabledExtensionNames = required_exts;
 		create_info.enabledExtensionCount = 3;
@@ -618,6 +623,7 @@ namespace vkb::vk
 		}
 
 		// Present Queue
+		if (queue_indices_.present != queue_indices_.graphics)
 		{
 			VkDeviceQueueCreateInfo queue_create_info {};
 			queue_create_info.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;

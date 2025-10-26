@@ -366,7 +366,7 @@ namespace vkb::vk
 		}
 
 		fseek(shader_file, 0, SEEK_END);
-		fgetpos(shader_file, &shader_size);
+		shader_size = ftell(shader_file);
 
 		fseek(shader_file, 0, SEEK_SET);
 		shader_buf = new uint32_t[shader_size / 4];

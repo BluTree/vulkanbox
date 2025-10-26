@@ -33,6 +33,9 @@ namespace vkb::cam
 
 			pitch_ += delta_y * .2;
 		}
+		// TODO Remove, debug
+		yaw_ = fmodf(yaw_ + 2 * .2, 360.f);
+		pitch_ += 0.5 * .2;
 
 		rot_ = quat::angle_axis({1.f, 0.f, 0.f, 1.f}, rad(-pitch_)) *
 		       quat::angle_axis({0.f, 0.f, 1.f, 1.f}, rad(-yaw_));

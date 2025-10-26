@@ -15,25 +15,39 @@ By ease of use, the current project uses default win32 and vulkan backends. Win3
 --]]
 
 local imgui_dest_dir = mg.get_build_dir() .. 'deps/imgui/'
-local imgui_url = 'https://github.com/ocornut/imgui/archive/refs/heads/docking.zip'
-if net.download(imgui_url, imgui_dest_dir) then
-	io.write('imgui: Updated \'docking\' branch\n')
-	os.copy_file('imgui/imconfig.h', imgui_dest_dir .. 'imconfig.h')
-else
-	io.write('imgui: up-to-date\n')
-end
+-- local imgui_url = 'https://github.com/ocornut/imgui/archive/refs/heads/docking.zip'
+-- if net.download(imgui_url, imgui_dest_dir) then
+-- 	io.write('imgui: Updated \'docking\' branch\n')
+-- 	os.copy_file('config/imgui/imconfig.h', imgui_dest_dir .. 'imconfig.h')
+-- else
+-- 	io.write('imgui: up-to-date\n')
+-- end
 
 require('deps/vulkan')
 
-local imgui = mg.project({
-	name = "imgui",
-	type = mg.project_type.sources,
-	sources = {
-		imgui_dest_dir .. '*.cpp',
-		imgui_dest_dir .. 'backends/imgui_impl_vulkan.cpp',
-		imgui_dest_dir .. 'backends/imgui_impl_win32.cpp'},
-	includes = merge(imgui_dest_dir, imgui_dest_dir .. 'backends/', vulkan.includes),
-	compile_options = {'-g'}
-})
+if (mg.platform() == 'windows') then
+	local imgui = mg.project({
+		name = "imgui",
+		type = mg.project_type.sources,
+		sources = {
+			imgui_dest_dir .. '*.cpp',
+			imgui_dest_dir .. 'backends/imgui_impl_vulkan.cpp',
+			imgui_dest_dir .. 'backends/imgui_impl_win32.cpp'},
+		includes = merge(imgui_dest_dir, imgui_dest_dir .. 'backends/', vulkan.includes),
+		compile_options = {'-g'}
+	})
 
-return {project = imgui, includes = {'deps/' .. imgui_dest_dir, 'deps/' .. imgui_dest_dir .. 'backends/'}}
+	return {project = imgui, includes = {'deps/' .. imgui_dest_dir, 'deps/' .. imgui_dest_dir .. 'backends/'}}
+elseif (mg.platform() == 'linux') then
+	local imgui = mg.project({
+		name = "imgui",
+		type = mg.project_type.sources,
+		sources = {
+			imgui_dest_dir .. '*.cpp',
+			imgui_dest_dir .. 'backends/imgui_impl_vulkan.cpp'},
+		includes = merge(imgui_dest_dir, imgui_dest_dir .. 'backends/', vulkan.includes),
+		compile_options = {'-g'}
+	})
+
+	return {project = imgui, includes = {'deps/' .. imgui_dest_dir, 'deps/' .. imgui_dest_dir .. 'backends/'}}
+end

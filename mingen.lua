@@ -1,4 +1,4 @@
-require('mingen/helpers')
+require('mg/helpers')
 
 if mg.need_generate() then
 	mg.configurations({'debug', 'release'})
@@ -11,6 +11,7 @@ stb = require('deps/stb')
 vma = require('deps/vma')
 slang = require('deps/slang')
 yyjson = require('deps/yyjson')
+
 
 include_dirs = merge(
 	{mg.get_build_dir() .. 'deps/', 'src/'},
@@ -48,6 +49,7 @@ end
 platform_link_options = {}
 if (mg.platform() == 'windows') then
 	platform_link_options = {
+		'-fuse-ld=lld-link',
 		'-Xlinker /incremental:no',
 		'-Xlinker /nodefaultlib:libcmt.lib',
 		'-Xlinker /defaultlib:msvcrt.lib',
@@ -58,8 +60,8 @@ end
 
 platform_deps = {}
 if (mg.platform() == 'windows') then
-	modular_win32 = require('deps/modular_win32')
-	superluminal = require('deps/superluminal')
+	modular_win32 = require('deps/windows/modular_win32')
+	superluminal = require('deps/windows/superluminal')
 	if superluminal ~= nil then
 		include_dirs = merge(
 			include_dirs,
@@ -75,6 +77,17 @@ if (mg.platform() == 'windows') then
 			modular_win32.includes
 		)
 	end
+elseif (mg.platform() == 'linux') then
+	wayland = require('deps/linux/wayland')
+	xkb = require('deps/linux/xkbcommon')
+	libdecor = require('deps/linux/libdecor')
+
+	include_dirs = merge(
+		include_dirs,
+		wayland.includes,
+		xkb.includes,
+		libdecor.includes)
+	platform_deps = merge(wayland.projects, xkb.project, libdecor.project)
 end
 
 local vkb = mg.project({
@@ -82,8 +95,8 @@ local vkb = mg.project({
 	type = mg.project_type.executable,
 	sources = {'src/vkb/**.cc'},
 	includes = include_dirs,
-	compile_options = merge('-g', '-std=c++20', '-Wall', '-Wextra', '-Werror', platform_define, platform_compile_options),
-	link_options = merge(platform_link_options, '-g', '-fuse-ld=lld-link'),
+	compile_options = merge('-g', '-std=c++20', '-Wall', '-Wextra', '-Werror', '-nostdinc++', platform_define, platform_compile_options),
+	link_options = merge(platform_link_options, '-g'),
 	dependencies = merge(imgui.project, vulkan.project, mincore.project, yyjson.project, platform_deps),
 	release = {
 		compile_options = {'-O2'}
@@ -91,6 +104,12 @@ local vkb = mg.project({
 })
 
 remove_platform_sources(vkb)
+
+for i=1, #vkb.sources do
+	if string.find(vkb.sources[i].file, 'vma') ~= nil then
+		vkb.sources[i].compile_options = string.gsub(vkb.compile_options, ' %-nostdinc%+%+', '')
+	end
+end
 
 local slangrc = mg.project({
 	name = 'slangrc',
@@ -107,7 +126,11 @@ local slangrc = mg.project({
 
 remove_platform_sources(slangrc)
 
-slangrc_bin = '"' .. mg.get_build_dir() .. 'bin/slangrc.exe"'
+slangrc_ext = ''
+if (mg.platform() == 'windows') then
+	slangrc_ext = '.exe'
+end
+slangrc_bin = '"' .. mg.get_build_dir() .. 'bin/slangrc' .. slangrc_ext .. '"'
 shaders = mg.collect_files('res/shaders/*.slang')
 for i=1,#shaders do
 	spirv = mg.get_build_dir() .. 'bin/' .. string.gsub(shaders[i], '.slang', '.spv')

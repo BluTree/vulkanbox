@@ -1,7 +1,11 @@
 #include "surface.hh"
 
+#ifdef VKB_WINDOWS
 #include <vulkan/vulkan_win32.h>
 #include <win32/misc.h>
+#elif defined(VKB_LINUX)
+#include <vulkan/vulkan_wayland.h>
+#endif
 
 #include "../log.hh"
 
@@ -12,6 +16,7 @@ namespace vkb::vk
 	surface::surface(window const& win)
 	: win_ {win}
 	{
+#ifdef VKB_WINDOWS
 		VkWin32SurfaceCreateInfoKHR create_info {};
 		create_info.sType = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR;
 		create_info.hwnd = win_.native_handle();
@@ -19,6 +24,15 @@ namespace vkb::vk
 
 		VkResult res = vkCreateWin32SurfaceKHR(instance::get().get_instance(),
 		                                       &create_info, nullptr, &surface_);
+#elif defined(VKB_LINUX)
+		// TODO
+		VkWaylandSurfaceCreateInfoKHR create_info {};
+		create_info.sType = VK_STRUCTURE_TYPE_WAYLAND_SURFACE_CREATE_INFO_KHR;
+		create_info.display = window::wayland_context().display_;
+		create_info.surface = reinterpret_cast<wl_surface*>(win.native_handle());
+		VkResult res = vkCreateWaylandSurfaceKHR(instance::get().get_instance(),
+		                                         &create_info, nullptr, &surface_);
+#endif
 		log::assert(res == VK_SUCCESS, "Failed to create surface");
 	}
 
