@@ -7,6 +7,7 @@
 #include "vk/material.hh"
 #include "vk/material/sky_sphere.hh"
 #include "vk/surface.hh"
+#include "win/display.hh"
 #include "win/window.hh"
 
 #include "log.hh"
@@ -30,8 +31,9 @@ int main(int argc, char** argv)
 
 	math::init_random();
 
+	display      disp;
 	input_system is;
-	window       main_window(&is);
+	window       main_window("main_window", &is);
 
 	vk::instance inst(enable_validation);
 	vk::surface  surface(main_window);
@@ -130,7 +132,7 @@ int main(int argc, char** argv)
 		last = now;
 
 		is.clear_transitions();
-		main_window.update();
+		disp.update();
 		cam.update(dt);
 
 		for (uint32_t i {0}; i < objs.size(); i++)
@@ -139,7 +141,8 @@ int main(int argc, char** argv)
 		if (!main_window.closed() && !main_window.minimized())
 		{
 			ui_ctx.update(dt);
-			ctx.prepare_draw(cam);
+			if (!ctx.prepare_draw(cam))
+				continue;
 			sky.prepare_draw(ctx.current_command_buffer(), ctx.current_img_idx(), cam,
 			                 ctx.get_proj());
 

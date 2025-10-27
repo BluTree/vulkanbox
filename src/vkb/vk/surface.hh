@@ -22,6 +22,7 @@ namespace vkb::vk
 		surface(window const& win);
 		~surface();
 
+		bool need_swapchain_update();
 		void create_swapchain();
 		void destroy_swapchain();
 

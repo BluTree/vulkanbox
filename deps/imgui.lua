@@ -15,13 +15,13 @@ By ease of use, the current project uses default win32 and vulkan backends. Win3
 --]]
 
 local imgui_dest_dir = mg.get_build_dir() .. 'deps/imgui/'
--- local imgui_url = 'https://github.com/ocornut/imgui/archive/refs/heads/docking.zip'
--- if net.download(imgui_url, imgui_dest_dir) then
--- 	io.write('imgui: Updated \'docking\' branch\n')
--- 	os.copy_file('config/imgui/imconfig.h', imgui_dest_dir .. 'imconfig.h')
--- else
--- 	io.write('imgui: up-to-date\n')
--- end
+local imgui_url = 'https://github.com/ocornut/imgui/archive/refs/heads/docking.zip'
+if net.download(imgui_url, imgui_dest_dir) then
+	io.write('imgui: Updated \'docking\' branch\n')
+	os.copy_file('config/imgui/imconfig.h', imgui_dest_dir .. 'imconfig.h')
+else
+	io.write('imgui: up-to-date\n')
+end
 
 require('deps/vulkan')
 

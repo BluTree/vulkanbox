@@ -14,5 +14,15 @@
 #pragma clang diagnostic ignored "-Wmissing-field-initializers"
 #pragma clang diagnostic ignored "-Wunused-variable"
 #pragma clang diagnostic ignored "-Wunused-private-field"
+// Do not show implementation on intellisense, as it will cause include issues (due to
+// nostdinc++ flag on sources)
+#ifdef __INTELLISENSE__
+#define OLD_VALUE __INTELLISENSE__
+#undef __INTELLISENSE__
+#endif
 #include <vk_mem_alloc.h>
+#ifdef OLD_VALUE
+#define __INTELLISENSE__
+#undef OLD_VALUE
+#endif
 #pragma clang diagnostic pop

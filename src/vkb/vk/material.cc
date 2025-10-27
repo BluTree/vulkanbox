@@ -290,7 +290,7 @@ namespace vkb::vk
 		if (pipe_layout_)
 			vkDestroyPipelineLayout(inst.get_device(), pipe_layout_, nullptr);
 
-		for (uint32_t i {0}; i > desc_set_layouts_.size(); ++i)
+		for (uint32_t i {0}; i < desc_set_layouts_.size(); ++i)
 		{
 			vkDestroyDescriptorSetLayout(inst.get_device(), desc_set_layouts_[i],
 			                             nullptr);

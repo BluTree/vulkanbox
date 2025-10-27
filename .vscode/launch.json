@@ -38,9 +38,9 @@
 			"type": "cppdbg",
 			"request": "launch",
 			"program": "${workspaceFolder}/build/bin/vulkanbox",
-			// "args": [
-			// 	"--validate"
-			// ],
+			"args": [
+				"--validate"
+			],
 			"stopAtEntry": false,
 			"cwd": "${workspaceFolder}/build/bin/",
 			"environment": [],

@@ -4,48 +4,29 @@
 
 #ifdef VKB_WINDOWS
 #include <win32/window.h>
-#elif defined(VKB_LINUX)
-#include <wayland-client.h>
 #endif
 
 #include <pair.hh>
-#include <string.hh>
+#include <string_view.hh>
 
 namespace vkb
 {
 	class input_system;
+	class display;
 }
-struct xdg_wm_base;
-struct zxdg_decoration_manager_v1;
-struct libdecor;
-struct wl_surface;
+#ifdef VKB_LINUX
 struct libdecor_frame;
 struct libdecor_configuration;
+#endif
 
 namespace vkb
 {
 	class window
 	{
+		friend display;
+
 	public:
-#ifdef VKB_LINUX
-		struct wayland
-		{
-			wl_display*    display_ {nullptr};
-			wl_compositor* compositor_ {nullptr};
-			wl_shm*        shm_ {nullptr};
-			wl_seat*       seat_ {nullptr};
-			mc::string     seat_name_;
-
-			wl_output* output_ {nullptr};
-
-			xdg_wm_base*                wm_base_ {nullptr};
-			zxdg_decoration_manager_v1* decoration_mgr {nullptr};
-			libdecor*                   libdecor_ {nullptr};
-		};
-
-		static wayland const& wayland_context();
-#endif
-		window(input_system* is = nullptr);
+		window(mc::string_view name, input_system* is = nullptr);
 		window(window const&) = delete;
 		window(window&&);
 		~window();
@@ -74,8 +55,6 @@ namespace vkb
 
 		static LRESULT wnd_proc(HWND hwnd, UINT msg, WPARAM w_param, LPARAM l_param);
 #elif defined(VKB_LINUX)
-		static wayland wl_;
-
 		static void libdecor_configure(libdecor_frame*         frame,
 		                               libdecor_configuration* configuration, void* ud);
 		static void libdecor_close(libdecor_frame* frame, void* ud);
@@ -83,7 +62,6 @@ namespace vkb
 		static void libdecor_dismiss_popup(struct libdecor_frame* frame,
 		                                   char const* seat_name, void* ud);
 
-		wl_surface*     surface_ {nullptr};
 		libdecor_frame* frame_;
 		uint32_t        state_;
 
@@ -91,10 +69,10 @@ namespace vkb
 		uint32_t h_ {0};
 #endif
 
-		[[maybe_unused]] void*         handle_;
-		[[maybe_unused]] input_system* is_;
+		void*         handle_;
+		input_system* is_;
 
-		[[maybe_unused]] bool closed_ {false};
-		[[maybe_unused]] bool min_ {false};
+		bool closed_ {false};
+		bool min_ {false};
 	};
 }

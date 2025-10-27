@@ -33,7 +33,8 @@ namespace vkb::vk
 	, surface_ {surface}
 	, mat_ {"res/shaders/default.spv"}
 	{
-		auto [w, h] = win_.size();
+		// auto [w, h] = win_.size();
+		auto [w, h] = surface_.get_extent();
 		proj_ = mat4::persp_proj(near_, far_, w / (float)h, rad(fov_deg_));
 
 		created_ = create_desc_set_layout();
@@ -135,7 +136,8 @@ namespace vkb::vk
 		far_ = far;
 		fov_deg_ = fov_deg;
 
-		auto [w, h] = win_.size();
+		// auto [w, h] = win_.size();
+		auto [w, h] = surface_.get_extent();
 		proj_ = mat4::persp_proj(near_, far_, w / (float)h, rad(fov_deg_));
 	}
 
@@ -232,7 +234,7 @@ namespace vkb::vk
 		vkFreeDescriptorSets(inst.get_device(), desc_pool_, 2, obj->desc_sets_);
 	}
 
-	void context::prepare_draw(cam::free& cam)
+	bool context::prepare_draw(cam::free& cam)
 	{
 		instance& inst = instance::get();
 
@@ -254,11 +256,12 @@ namespace vkb::vk
 			vkAcquireNextImageKHR(inst.get_device(), surface_.get_swapchain(), UINT64_MAX,
 		                          new_img_avail_semaphore, VK_NULL_HANDLE, &img_idx_);
 
-		if (res == VK_ERROR_OUT_OF_DATE_KHR)
-		{
-			recreate_swapchain();
-			return;
-		}
+		// if (res == VK_ERROR_OUT_OF_DATE_KHR || surface_.need_swapchain_update())
+		// {
+		// 	recycled_semaphores_.emplace_back(new_img_avail_semaphore);
+		// 	recreate_swapchain();
+		// 	return false;
+		// }
 
 		vkWaitForFences(inst.get_device(), 1, &in_flight_fences_[img_idx_], VK_TRUE,
 		                UINT64_MAX);
@@ -278,7 +281,7 @@ namespace vkb::vk
 
 		res = vkBeginCommandBuffer(command_buffers_[img_idx_], &begin_info);
 		if (res != VK_SUCCESS)
-			return;
+			return false;
 
 		struct
 		{
@@ -325,6 +328,8 @@ namespace vkb::vk
 			VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,            // srcStage
 			VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT // dstStage
 		);
+
+		return true;
 	}
 
 	void context::begin_draw()
@@ -427,7 +432,8 @@ namespace vkb::vk
 		present_info.pImageIndices = &img_idx_;
 
 		VkResult res = vkQueuePresentKHR(inst.get_present_queue(), &present_info);
-		if (res == VK_ERROR_OUT_OF_DATE_KHR || res == VK_SUBOPTIMAL_KHR)
+		if (res == VK_ERROR_OUT_OF_DATE_KHR || res == VK_SUBOPTIMAL_KHR ||
+		    surface_.need_swapchain_update())
 			recreate_swapchain();
 
 		cur_frame_ = (cur_frame_ + 1) % context::max_frames_in_flight;

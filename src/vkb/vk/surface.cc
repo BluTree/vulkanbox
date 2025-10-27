@@ -7,6 +7,8 @@
 #include <vulkan/vulkan_wayland.h>
 #endif
 
+#include "../win/display.hh"
+
 #include "../log.hh"
 
 #include "instance.hh"
@@ -28,7 +30,7 @@ namespace vkb::vk
 		// TODO
 		VkWaylandSurfaceCreateInfoKHR create_info {};
 		create_info.sType = VK_STRUCTURE_TYPE_WAYLAND_SURFACE_CREATE_INFO_KHR;
-		create_info.display = window::wayland_context().display_;
+		create_info.display = display::get().get_display();
 		create_info.surface = reinterpret_cast<wl_surface*>(win.native_handle());
 		VkResult res = vkCreateWaylandSurfaceKHR(instance::get().get_instance(),
 		                                         &create_info, nullptr, &surface_);
@@ -42,6 +44,14 @@ namespace vkb::vk
 
 		if (surface_)
 			vkDestroySurfaceKHR(instance::get().get_instance(), surface_, nullptr);
+	}
+
+	bool surface::need_swapchain_update()
+	{
+		auto [swap_w, swap_h] = swapchain_extent_;
+		auto [win_w, win_h] = win_.size();
+
+		return swap_w != win_w || swap_h != win_h;
 	}
 
 	void surface::create_swapchain()

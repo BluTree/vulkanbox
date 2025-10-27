@@ -9,5 +9,8 @@
 	"files.associations": {
 		"*.sln": "xml",
 		"log": "log",
-	}
+	},
+	"cSpell.words": [
+		"libdecor"
+	]
 }
