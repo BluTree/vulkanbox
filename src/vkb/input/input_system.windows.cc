@@ -148,58 +148,6 @@ namespace vkb
 
 	input_system::~input_system() {}
 
-	void input_system::clear_transitions()
-	{
-		for (mc::underlying_type<key> i {0}; i < mc::to_underlying(key::max_enum); ++i)
-			key_states_[i * 2 / 8] &= ~(1 << (i * 2 % 8 + 1));
-
-		wheel_ = {0.f, 0.f};
-		pos_rel_ = {0, 0};
-	}
-
-	bool input_system::pressed(key k) const
-	{
-		return (key_states_[mc::to_underlying(k) * 2 / 8] &
-		        (1 << (mc::to_underlying(k) * 2 % 8))) != 0;
-	}
-
-	bool input_system::released(key k) const
-	{
-		return (key_states_[mc::to_underlying(k) * 2 / 8] &
-		        (1 << (mc::to_underlying(k) * 2 % 8))) == 0;
-	}
-
-	bool input_system::just_pressed(key k) const
-	{
-		return ((key_states_[mc::to_underlying(k) * 2 / 8] &
-		         (1 << (mc::to_underlying(k) * 2 % 8))) != 0) &&
-		       ((key_states_[mc::to_underlying(k) * 2 / 8] &
-		         (1 << ((mc::to_underlying(k) * 2 + 1) % 8))) != 0);
-	}
-
-	bool input_system::just_released(key k) const
-	{
-		return ((key_states_[mc::to_underlying(k) * 2 / 8] &
-		         (1 << (mc::to_underlying(k) * 2 % 8))) == 0) &&
-		       ((key_states_[mc::to_underlying(k) * 2 / 8] &
-		         (1 << ((mc::to_underlying(k) * 2 + 1) % 8))) != 0);
-	}
-
-	mc::pair<float, float> input_system::mouse_wheel() const
-	{
-		return wheel_;
-	}
-
-	mc::pair<int32_t, int32_t> input_system::mouse_pos() const
-	{
-		return pos_abs_;
-	}
-
-	mc::pair<int32_t, int32_t> input_system::mouse_delta() const
-	{
-		return pos_rel_;
-	}
-
 	void input_system::handle_event([[maybe_unused]] uint64_t w_param, uint64_t l_param)
 	{
 		uint32_t size {0};
@@ -221,28 +169,9 @@ namespace vkb
 			else if ((data->data.keyboard.Flags & RI_KEY_E1) != 0)
 				sc |= 0xe100;
 
-			key  k = convert_scancode_to_key(sc);
-			bool last_pressed = (key_states_[mc::to_underlying(k) / 8] &
-			                     (1 << (mc::to_underlying(k) % 8))) != 0;
+			key k = convert_scancode_to_key(sc);
 
-			if ((data->data.keyboard.Flags & RI_KEY_BREAK) != 0)
-			{
-				key_states_[mc::to_underlying(k) * 2 / 8] &=
-					~(1 << (mc::to_underlying(k) * 2 % 8));
-
-				if (last_pressed)
-					key_states_[mc::to_underlying(k) * 2 / 8] |=
-						(1 << (mc::to_underlying(k) * 2 % 8 + 1));
-			}
-			else
-			{
-				key_states_[mc::to_underlying(k) * 2 / 8] |=
-					(1 << (mc::to_underlying(k) * 2 % 8));
-
-				if (!last_pressed)
-					key_states_[mc::to_underlying(k) * 2 / 8] |=
-						(1 << (mc::to_underlying(k) * 2 % 8 + 1));
-			}
+			set_state(k, data->data.keyboard.Flags & RI_KEY_BREAK);
 		}
 		else if (data->header.dwType == RIM_TYPEMOUSE)
 		{
@@ -270,129 +199,29 @@ namespace vkb
 			}
 
 			if ((data->data.mouse.usButtonFlags & RI_MOUSE_BUTTON_1_DOWN) != 0)
-			{
-				bool last_pressed = (key_states_[mc::to_underlying(key::m1) * 2 / 8] &
-				                     (1 << (mc::to_underlying(key::m1) * 2 % 8))) != 0;
-
-				key_states_[mc::to_underlying(key::m1) * 2 / 8] |=
-					(1 << (mc::to_underlying(key::m1) * 2 % 8));
-
-				if (!last_pressed)
-					key_states_[mc::to_underlying(key::m1) * 2 / 8] |=
-						(1 << (mc::to_underlying(key::m1) * 2 % 8 + 1));
-			}
+				set_state(key::m1, true);
 			else if ((data->data.mouse.usButtonFlags & RI_MOUSE_BUTTON_1_UP) != 0)
-			{
-				bool last_pressed = (key_states_[mc::to_underlying(key::m1) * 2 / 8] &
-				                     (1 << (mc::to_underlying(key::m1) * 2 % 8))) != 0;
-
-				key_states_[mc::to_underlying(key::m1) * 2 / 8] &=
-					~(1 << (mc::to_underlying(key::m1) * 2 % 8));
-
-				if (last_pressed)
-					key_states_[mc::to_underlying(key::m1) * 2 / 8] |=
-						(1 << (mc::to_underlying(key::m1) * 2 % 8 + 1));
-			}
+				set_state(key::m1, false);
 
 			if ((data->data.mouse.usButtonFlags & RI_MOUSE_BUTTON_2_DOWN) != 0)
-			{
-				bool last_pressed = (key_states_[mc::to_underlying(key::m2) * 2 / 8] &
-				                     (1 << (mc::to_underlying(key::m2) * 2 % 8))) != 0;
-
-				key_states_[mc::to_underlying(key::m2) * 2 / 8] |=
-					(1 << (mc::to_underlying(key::m2) * 2 % 8));
-
-				if (!last_pressed)
-					key_states_[mc::to_underlying(key::m2) * 2 / 8] |=
-						(1 << (mc::to_underlying(key::m2) * 2 % 8 + 1));
-			}
+				set_state(key::m2, true);
 			else if ((data->data.mouse.usButtonFlags & RI_MOUSE_BUTTON_2_UP) != 0)
-			{
-				bool last_pressed = (key_states_[mc::to_underlying(key::m2) * 2 / 8] &
-				                     (1 << (mc::to_underlying(key::m2) * 2 % 8))) != 0;
-
-				key_states_[mc::to_underlying(key::m2) * 2 / 8] &=
-					~(1 << (mc::to_underlying(key::m2) * 2 % 8));
-
-				if (last_pressed)
-					key_states_[mc::to_underlying(key::m2) * 2 / 8] |=
-						(1 << (mc::to_underlying(key::m2) * 2 % 8 + 1));
-			}
+				set_state(key::m2, false);
 
 			if ((data->data.mouse.usButtonFlags & RI_MOUSE_BUTTON_3_DOWN) != 0)
-			{
-				bool last_pressed = (key_states_[mc::to_underlying(key::m3) * 2 / 8] &
-				                     (1 << (mc::to_underlying(key::m3) * 2 % 8))) != 0;
-
-				key_states_[mc::to_underlying(key::m3) * 2 / 8] |=
-					(1 << (mc::to_underlying(key::m3) * 2 % 8));
-
-				if (!last_pressed)
-					key_states_[mc::to_underlying(key::m3) * 2 / 8] |=
-						(1 << (mc::to_underlying(key::m3) * 2 % 8 + 1));
-			}
+				set_state(key::m3, true);
 			else if ((data->data.mouse.usButtonFlags & RI_MOUSE_BUTTON_3_UP) != 0)
-			{
-				bool last_pressed = (key_states_[mc::to_underlying(key::m3) * 2 / 8] &
-				                     (1 << (mc::to_underlying(key::m3) * 2 % 8))) != 0;
-
-				key_states_[mc::to_underlying(key::m3) * 2 / 8] &=
-					~(1 << (mc::to_underlying(key::m3) * 2 % 8));
-
-				if (last_pressed)
-					key_states_[mc::to_underlying(key::m3) * 2 / 8] |=
-						(1 << (mc::to_underlying(key::m3) * 2 % 8 + 1));
-			}
+				set_state(key::m3, false);
 
 			if ((data->data.mouse.usButtonFlags & RI_MOUSE_BUTTON_4_DOWN) != 0)
-			{
-				bool last_pressed = (key_states_[mc::to_underlying(key::m4) * 2 / 8] &
-				                     (1 << (mc::to_underlying(key::m4) * 2 % 8))) != 0;
-
-				key_states_[mc::to_underlying(key::m4) * 2 / 8] |=
-					(1 << (mc::to_underlying(key::m4) * 2 % 8));
-
-				if (!last_pressed)
-					key_states_[mc::to_underlying(key::m4) * 2 / 8] |=
-						(1 << (mc::to_underlying(key::m4) * 2 % 8 + 1));
-			}
+				set_state(key::m4, true);
 			else if ((data->data.mouse.usButtonFlags & RI_MOUSE_BUTTON_4_UP) != 0)
-			{
-				bool last_pressed = (key_states_[mc::to_underlying(key::m4) * 2 / 8] &
-				                     (1 << (mc::to_underlying(key::m4) * 2 % 8))) != 0;
-
-				key_states_[mc::to_underlying(key::m4) * 2 / 8] &=
-					~(1 << (mc::to_underlying(key::m4) * 2 % 8));
-
-				if (last_pressed)
-					key_states_[mc::to_underlying(key::m4) * 2 / 8] |=
-						(1 << (mc::to_underlying(key::m4) * 2 % 8 + 1));
-			}
+				set_state(key::m4, false);
 
 			if ((data->data.mouse.usButtonFlags & RI_MOUSE_BUTTON_5_DOWN) != 0)
-			{
-				bool last_pressed = (key_states_[mc::to_underlying(key::m5) * 2 / 8] &
-				                     (1 << (mc::to_underlying(key::m5) * 2 % 8))) != 0;
-
-				key_states_[mc::to_underlying(key::m5) * 2 / 8] |=
-					(1 << (mc::to_underlying(key::m5) * 2 % 8));
-
-				if (!last_pressed)
-					key_states_[mc::to_underlying(key::m5) * 2 / 8] |=
-						(1 << (mc::to_underlying(key::m5) * 2 % 8 + 1));
-			}
+				set_state(key::m5, true);
 			else if ((data->data.mouse.usButtonFlags & RI_MOUSE_BUTTON_5_UP) != 0)
-			{
-				bool last_pressed = (key_states_[mc::to_underlying(key::m5) * 2 / 8] &
-				                     (1 << (mc::to_underlying(key::m5) * 2 % 8))) != 0;
-
-				key_states_[mc::to_underlying(key::m5) * 2 / 8] &=
-					~(1 << (mc::to_underlying(key::m5) * 2 % 8));
-
-				if (last_pressed)
-					key_states_[mc::to_underlying(key::m5) * 2 / 8] |=
-						(1 << (mc::to_underlying(key::m5) * 2 % 8 + 1));
-			}
+				set_state(key::m5, false);
 		}
 
 		delete[] bytes;

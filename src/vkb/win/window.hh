@@ -62,6 +62,12 @@ namespace vkb
 		static void libdecor_dismiss_popup(struct libdecor_frame* frame,
 		                                   char const* seat_name, void* ud);
 
+		void pointer_motion(int32_t x, int32_t y);
+		void pointer_button(uint32_t button, uint32_t state);
+		void pointer_axis(uint32_t axis, int32_t state);
+
+		void keyboard_key(uint32_t key, uint32_t state);
+
 		libdecor_frame* frame_;
 		uint32_t        state_;
 

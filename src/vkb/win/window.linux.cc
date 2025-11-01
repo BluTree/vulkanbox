@@ -1,5 +1,6 @@
 #include "window.hh"
 
+#include "../input/input_system.hh"
 #include "../log.hh"
 #include "display.hh"
 
@@ -55,7 +56,11 @@ namespace vkb
 		disp.add_window(this);
 	}
 
-	window::~window() {}
+	window::~window()
+	{
+		display& disp {display::get()};
+		disp.remove_window(this);
+	}
 
 	void window::update() {}
 
@@ -157,5 +162,29 @@ namespace vkb
 	                                    [[maybe_unused]] void*                  ud)
 	{
 		// popup_destroy(window->popup);
+	}
+
+	void window::pointer_motion(int32_t x, int32_t y)
+	{
+		if (is_)
+			is_->pointer_motion(x, y);
+	}
+
+	void window::pointer_button(uint32_t button, uint32_t state)
+	{
+		if (is_)
+			is_->pointer_button(button, state);
+	}
+
+	void window::pointer_axis(uint32_t axis, int32_t state)
+	{
+		if (is_)
+			is_->pointer_axis(axis, state);
+	}
+
+	void window::keyboard_key(uint32_t key, uint32_t state)
+	{
+		if (is_)
+			is_->keyboard_key(key, state);
 	}
 } // namespace vkb

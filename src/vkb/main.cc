@@ -96,7 +96,7 @@ int main(int argc, char** argv)
 	ctx.set_proj(0.1f, 1000.f, 70.f);
 
 	mc::vector<vk::object> objs;
-	objs.reserve(1);
+	objs.reserve(100);
 
 	srand(0);
 

@@ -13,9 +13,7 @@ namespace vkb
 
 	class input_system
 	{
-#ifdef VKB_WINDOWS
 		friend window;
-#endif
 
 	public:
 		input_system();
@@ -38,13 +36,20 @@ namespace vkb
 		mc::pair<int32_t, int32_t> mouse_delta() const;
 
 	private:
+		void set_state(key k, bool pressed);
+
 #ifdef VKB_WINDOWS
 		void handle_event(uint64_t w_param, uint64_t l_param);
+#elif defined(VKB_LINUX)
+		void pointer_motion(int32_t x, int32_t y);
+		void pointer_button(uint32_t button, uint32_t state);
+		void pointer_axis(uint32_t axis, int32_t state);
 
+		void keyboard_key(uint32_t key, uint32_t state);
+#endif
 		uint8_t key_states_[(mc::to_underlying(key::max_enum) * 2) / 8 + 1];
 		mc::pair<float, float>     wheel_ {0.f, 0.f};
 		mc::pair<int32_t, int32_t> pos_abs_ {0, 0};
 		mc::pair<int32_t, int32_t> pos_rel_ {0, 0};
-#endif
 	};
 };
