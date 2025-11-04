@@ -34,8 +34,6 @@ namespace vkb
 		window& operator=(window const&) = delete;
 		window& operator=(window&&);
 
-		void update();
-
 		bool  closed() const;
 		bool  minimized() const;
 		void* native_handle() const;
@@ -50,6 +48,7 @@ namespace vkb
 		void hide_mouse() const;
 
 	private:
+		void update();
 #ifdef VKB_WINDOWS
 		static uint16_t class_id;
 

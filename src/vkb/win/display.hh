@@ -59,8 +59,11 @@ namespace vkb
 
 		void add_window(window* win);
 		void remove_window(window* win);
+#ifdef VKB_WINDOWS
+		mc::vector<window*> windows_;
 
-#ifdef VKB_LINUX
+		uint16_t class_id_ {0};
+#elif defined(VKB_LINUX)
 		static void registry_handle(void* ud, wl_registry* registry, uint32_t id,
 		                            char const* interface, uint32_t version);
 		static void registry_remove(void* ud, wl_registry* registry, uint32_t id);

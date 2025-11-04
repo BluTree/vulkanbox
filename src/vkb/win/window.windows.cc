@@ -2,6 +2,7 @@
 
 #include "../input/input_system.hh"
 #include "../log.hh"
+#include "display.hh"
 
 #include <imgui/backends/imgui_impl_win32.h>
 #include <win32/misc.h>
@@ -16,27 +17,14 @@ namespace vkb
 {
 	uint16_t window::class_id {0};
 
-	window::window(input_system* is)
+	window::window([[maybe_unused]] mc::string_view name, input_system* is)
 	{
 		is_ = is;
-		HMODULE instance = GetModuleHandleW(nullptr);
-		if (!window::class_id)
-		{
-			WNDCLASSEXW wnd_class;
-			memset(&wnd_class, 0, sizeof(WNDCLASSEXW));
-			wnd_class.cbSize = sizeof(WNDCLASSEXW);
-			wnd_class.lpfnWndProc = wnd_proc;
-			wnd_class.hInstance = instance;
-			wnd_class.hIcon = nullptr;
-			wnd_class.hbrBackground = (HBRUSH)(1 /*COLOR_BACKGROUND*/ + 1);
-			wnd_class.lpszClassName = L"vulkanbox_window";
 
-			window::class_id = RegisterClassExW(&wnd_class);
-		}
-
-		handle_ = CreateWindowExW(0, L"vulkanbox_window", L"main_window",
-		                          WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT, 1000,
-		                          800, nullptr, nullptr, instance, nullptr);
+		handle_ =
+			CreateWindowExW(0, L"vulkanbox_window", L"main_window", WS_OVERLAPPEDWINDOW,
+		                    CW_USEDEFAULT, CW_USEDEFAULT, 1000, 800, nullptr, nullptr,
+		                    GetModuleHandleW(nullptr), nullptr);
 		if (!handle_)
 		{
 			log::error("Cannot create window");
@@ -47,6 +35,8 @@ namespace vkb
 			SetWindowLongPtrW(handle_, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(this));
 
 			ShowWindow(handle_, SW_NORMAL);
+
+			display::get().add_window(this);
 		}
 	}
 
@@ -60,7 +50,10 @@ namespace vkb
 	window::~window()
 	{
 		if (handle_)
+		{
 			DestroyWindow(handle_);
+			display::get().remove_window(this);
+		}
 	}
 
 	window& window::operator=([[maybe_unused]] window&& other)
@@ -69,25 +62,6 @@ namespace vkb
 		SetWindowLongPtrW(handle_, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(this));
 		other.handle_ = nullptr;
 		return *this;
-	}
-
-	void window::update()
-	{
-		if (!handle_)
-			return;
-
-		if (closed_)
-		{
-			handle_ = nullptr;
-			return;
-		}
-
-		MSG msg;
-		while (PeekMessageW(&msg, handle_, 0U, 0U, PM_REMOVE))
-		{
-			TranslateMessage(&msg);
-			DispatchMessageW(&msg);
-		}
 	}
 
 	bool window::closed() const
@@ -142,6 +116,19 @@ namespace vkb
 	void window::hide_mouse() const
 	{
 		ShowCursor(false);
+	}
+
+	void window::update()
+	{
+		if (!handle_ || closed_)
+			return;
+
+		MSG msg;
+		while (PeekMessageW(&msg, handle_, 0U, 0U, PM_REMOVE))
+		{
+			TranslateMessage(&msg);
+			DispatchMessageW(&msg);
+		}
 	}
 
 	LRESULT window::wnd_proc(HWND hwnd, UINT msg, WPARAM w_param, LPARAM l_param)

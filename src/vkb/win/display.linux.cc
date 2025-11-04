@@ -22,13 +22,6 @@ namespace vkb
 		}
 	}
 
-	display* display::instance_ {nullptr};
-
-	display& display::get()
-	{
-		return *instance_;
-	}
-
 	display::display()
 	{
 		instance_ = this;

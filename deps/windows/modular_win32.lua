@@ -6,4 +6,4 @@ else
 	io.write('modular_win32: up-to-date\n')
 end
 
-return {includes = 'deps/' .. modular_win32_dest_dir .. 'include/'}
+return {includes = 'deps/windows/' .. modular_win32_dest_dir .. 'include/'}

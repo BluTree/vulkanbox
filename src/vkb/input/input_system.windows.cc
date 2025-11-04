@@ -171,7 +171,7 @@ namespace vkb
 
 			key k = convert_scancode_to_key(sc);
 
-			set_state(k, data->data.keyboard.Flags & RI_KEY_BREAK);
+			set_state(k, !(data->data.keyboard.Flags & RI_KEY_BREAK));
 		}
 		else if (data->header.dwType == RIM_TYPEMOUSE)
 		{
