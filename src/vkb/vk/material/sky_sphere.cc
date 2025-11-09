@@ -1,5 +1,6 @@
 #include "sky_sphere.hh"
 
+#include "../../cam/base.hh"
 #include "../../log.hh"
 #include "../../math/mat4.hh"
 #include "../../math/math.hh"
@@ -397,7 +398,7 @@ namespace vkb::vk
 	}
 
 	void sky_sphere::prepare_draw(VkCommandBuffer cmd, uint32_t const img_idx,
-	                              cam::free const& cam, mat4 const& proj)
+	                              cam::base const& cam, mat4 const& proj)
 	{
 		instance& inst = instance::get();
 		mat4      transform = cam.rot_mat() * proj;

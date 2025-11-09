@@ -2,8 +2,19 @@
 
 #include <vulkan/vulkan.h>
 
-#include "../../cam/free.hh"
 #include "../buffer.hh"
+
+#include "../../math/vec4.hh"
+
+namespace vkb
+{
+	class mat4;
+
+	namespace cam
+	{
+		class base;
+	}
+}
 
 namespace vkb::vk
 {
@@ -19,7 +30,7 @@ namespace vkb::vk
 		sky_sphere& operator=(sky_sphere&&) = delete;
 
 		void prepare_draw(VkCommandBuffer cmd, uint32_t const img_idx,
-		                  cam::free const& cam, mat4 const& proj);
+		                  cam::base const& cam, mat4 const& proj);
 		void draw(VkCommandBuffer cmd, uint32_t const img_idx);
 
 	private:

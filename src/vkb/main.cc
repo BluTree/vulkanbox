@@ -1,4 +1,4 @@
-#include "cam/free.hh"
+#include "cam/orbital.hh"
 #include "core/time.hh"
 #include "input/input_system.hh"
 #include "ui/context.hh"
@@ -43,8 +43,8 @@ int main(int argc, char** argv)
 
 	vk::context ctx(main_window, surface);
 
-	cam::free   cam(is, main_window);
-	ui::context ui_ctx(main_window, is, ctx, cam);
+	cam::orbital cam(is, main_window);
+	ui::context  ui_ctx(main_window, is, ctx);
 
 	vk::sky_sphere sky;
 
@@ -105,7 +105,30 @@ int main(int argc, char** argv)
 	ctx.init_model(model, verts, idcs);
 	ctx.init_texture(tex, "res/textures/tex.png");
 
-	for (uint32_t i {0}; i < objs.capacity(); i++)
+	vk::object& main_obj = objs.emplace_back();
+	main_obj.pos = {0, 0, 0, 1.0f};
+	main_obj.rot_axis =
+		vkb::vec4(static_cast<float>(rand() % 100), static_cast<float>(rand() % 100),
+	              static_cast<float>(rand() % 100), 1.0f)
+			.norm3();
+	main_obj.scale = {1.5f, 1.5f, 1.5f, 1.f};
+	main_obj.rot_speed = 1 / 50.f;
+
+	main_obj.model = &model;
+	main_obj.tex = &tex;
+	ctx.init_object(&main_obj);
+
+	vk::object& cam_view_obj = objs.emplace_back();
+	cam_view_obj.pos = {0, 0, 0, 1.0f};
+	cam_view_obj.rot_axis = vkb::vec4(0, 1.f, 0, 1.0f).norm3();
+	cam_view_obj.scale = {0.2f, 0.2f, 0.2f, 1.f};
+	cam_view_obj.rot_speed = 0.f;
+
+	cam_view_obj.model = &model;
+	cam_view_obj.tex = &tex;
+	ctx.init_object(&cam_view_obj);
+
+	for (uint32_t i {2}; i < objs.capacity(); i++)
 	{
 		vk::object& obj = objs.emplace_back();
 		obj.pos = {static_cast<float>(rand() % 100), static_cast<float>(rand() % 100),
@@ -134,6 +157,7 @@ int main(int argc, char** argv)
 		is.clear_transitions();
 		disp.update();
 		cam.update(dt);
+		cam_view_obj.pos = cam.view_pos();
 
 		for (uint32_t i {0}; i < objs.size(); i++)
 			objs[i].update(dt);

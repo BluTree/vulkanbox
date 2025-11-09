@@ -187,12 +187,12 @@ namespace vkb
 				pos_rel_.second += data->data.mouse.lLastY;
 			}
 
-			if ((data->data.mouse.usButtonFlags & RI_MOUSE_WHEEL) != 0)
+			if ((data->data.mouse.usButtonFlags & RI_MOUSE_HWHEEL) != 0)
 			{
 				wheel_.first += static_cast<int16_t>(data->data.mouse.usButtonData) /
 				                static_cast<float>(WHEEL_DELTA);
 			}
-			else if ((data->data.mouse.usButtonFlags & RI_MOUSE_HWHEEL) != 0)
+			else if ((data->data.mouse.usButtonFlags & RI_MOUSE_WHEEL) != 0)
 			{
 				wheel_.second += static_cast<int16_t>(data->data.mouse.usButtonData) /
 				                 static_cast<float>(WHEEL_DELTA);

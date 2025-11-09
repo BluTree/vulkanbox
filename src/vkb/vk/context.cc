@@ -234,7 +234,7 @@ namespace vkb::vk
 		vkFreeDescriptorSets(inst.get_device(), desc_pool_, 2, obj->desc_sets_);
 	}
 
-	bool context::prepare_draw(cam::free& cam)
+	bool context::prepare_draw(cam::base& cam)
 	{
 		instance& inst = instance::get();
 

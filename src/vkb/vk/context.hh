@@ -26,7 +26,7 @@ namespace vkb
 
 	namespace cam
 	{
-		class free;
+		class base;
 	}
 }
 
@@ -56,7 +56,7 @@ namespace vkb::vk
 		bool init_object(object* obj);
 		void destroy_object(object* obj);
 
-		bool prepare_draw(cam::free& cam);
+		bool prepare_draw(cam::base& cam);
 		void begin_draw();
 		void draw();
 		void present();

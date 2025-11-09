@@ -41,11 +41,10 @@ namespace vkb::ui
 #endif
 	}
 
-	context::context(window& win, input_system& is, vk::context& vk, cam::free& cam)
+	context::context(window& win, input_system& is, vk::context& vk)
 	: win_ {win}
 	, is_ {is}
 	, vk_ {vk}
-	, cam_ {cam}
 	{
 #ifdef VKB_WINDOWS
 		ImGui::CreateContext();
