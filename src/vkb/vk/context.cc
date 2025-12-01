@@ -386,7 +386,7 @@ namespace vkb::vk
 			record_command_buffer(command_buffers_[img_idx_], objs_[i]);
 	}
 
-	void context::present()
+	bool context::present()
 	{
 		instance& inst = instance::get();
 
@@ -431,12 +431,18 @@ namespace vkb::vk
 		present_info.pSwapchains = swapchains;
 		present_info.pImageIndices = &img_idx_;
 
+		bool     need_swapchain_update = false;
 		VkResult res = vkQueuePresentKHR(inst.get_present_queue(), &present_info);
-		if (res == VK_ERROR_OUT_OF_DATE_KHR || res == VK_SUBOPTIMAL_KHR ||
-		    surface_.need_swapchain_update())
+		need_swapchain_update = res == VK_ERROR_OUT_OF_DATE_KHR ||
+		                        res == VK_SUBOPTIMAL_KHR ||
+		                        surface_.need_swapchain_update();
+
+		if (need_swapchain_update)
 			recreate_swapchain();
 
 		cur_frame_ = (cur_frame_ + 1) % context::max_frames_in_flight;
+
+		return need_swapchain_update;
 	}
 
 	void context::fill_init_info(ImGui_ImplVulkan_InitInfo& init_info)

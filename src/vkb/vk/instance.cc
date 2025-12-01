@@ -635,6 +635,7 @@ namespace vkb::vk
 
 		VkPhysicalDeviceFeatures feats {};
 		feats.samplerAnisotropy = VK_TRUE;
+		feats.wideLines = VK_TRUE;
 
 		VkPhysicalDeviceVulkan13Features vulkan13_feats {};
 		vulkan13_feats.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES;

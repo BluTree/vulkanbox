@@ -5,6 +5,8 @@
 #include "vk/context.hh"
 #include "vk/instance.hh"
 #include "vk/material.hh"
+#include "vk/material/coordinates.hh"
+#include "vk/material/module.hh"
 #include "vk/material/sky_sphere.hh"
 #include "vk/surface.hh"
 #include "win/display.hh"
@@ -105,18 +107,27 @@ int main(int argc, char** argv)
 	ctx.init_model(model, verts, idcs);
 	ctx.init_texture(tex, "res/textures/tex.png");
 
-	vk::object& main_obj = objs.emplace_back();
-	main_obj.pos = {0, 0, 0, 1.0f};
-	main_obj.rot_axis =
-		vkb::vec4(static_cast<float>(rand() % 100), static_cast<float>(rand() % 100),
-	              static_cast<float>(rand() % 100), 1.0f)
-			.norm3();
-	main_obj.scale = {1.5f, 1.5f, 1.5f, 1.f};
-	main_obj.rot_speed = 1 / 50.f;
+	vk::module mod(tex);
 
-	main_obj.model = &model;
-	main_obj.tex = &tex;
-	ctx.init_object(&main_obj);
+	vk::coordinates coords;
+
+	// TODO Create a screen space context handling resizing
+	auto [w, h] = surface.get_extent();
+	mat4 coords_proj = mat4::ortho_proj(-50.f, 50.f, 0, w, h, 0);
+	vec2 translate {(75.f * 2 / w), ((h - 75.f) * 2 / h)};
+
+	// vk::object& main_obj = objs.emplace_back();
+	// main_obj.pos = {0, 0, 0, 1.0f};
+	// main_obj.rot_axis =
+	// 	vkb::vec4(static_cast<float>(rand() % 100), static_cast<float>(rand() % 100),
+	//               static_cast<float>(rand() % 100), 1.0f)
+	// 		.norm3();
+	// main_obj.scale = {1.5f, 1.5f, 1.5f, 1.f};
+	// main_obj.rot_speed = 1 / 50.f;
+
+	// main_obj.model = &model;
+	// main_obj.tex = &tex;
+	// ctx.init_object(&main_obj);
 
 	vk::object& cam_view_obj = objs.emplace_back();
 	cam_view_obj.pos = {0, 0, 0, 1.0f};
@@ -128,22 +139,32 @@ int main(int argc, char** argv)
 	cam_view_obj.tex = &tex;
 	ctx.init_object(&cam_view_obj);
 
-	for (uint32_t i {2}; i < objs.capacity(); i++)
-	{
-		vk::object& obj = objs.emplace_back();
-		obj.pos = {static_cast<float>(rand() % 100), static_cast<float>(rand() % 100),
-		           static_cast<float>(rand() % 100), 1.0f};
-		obj.rot_axis =
-			vkb::vec4(static_cast<float>(rand() % 100), static_cast<float>(rand() % 100),
-		              static_cast<float>(rand() % 100), 1.0f)
-				.norm3();
-		obj.scale = {.5f, .5f, .5f, 1.f};
-		obj.rot_speed = static_cast<float>(rand() % 100) / 50.f;
+	mc::vector<mat4> modules;
+	modules.emplace_back(mat4::scale({.5f, .5f, .5f, 1.f}));
+	modules.emplace_back(mat4::scale({.5f, .5f, .5f, 1.f}) *
+	                     mat4::translate({0.f, 0.f, 2.f, 1.f}));
+	modules.emplace_back(mat4::scale({.5f, .5f, .5f, 1.f}) *
+	                     mat4::translate({0.f, 0.f, 4.f, 1.f}));
+	modules.emplace_back(mat4::scale({.5f, .5f, .5f, 1.f}) *
+	                     mat4::translate({0.f, 2.f, 0.f, 1.f}));
+	modules.emplace_back(mat4::scale({.5f, .5f, .5f, 1.f}) *
+	                     mat4::translate({2.f, 0.f, 0.f, 1.f}));
 
-		obj.model = &model;
-		obj.tex = &tex;
-		ctx.init_object(&obj);
-	}
+	// for (uint32_t i {2}; i < objs.capacity(); i++)
+	// {
+	// 	vk::object& obj = objs.emplace_back();
+	// 	obj.pos = {static_cast<float>(rand() % 100), static_cast<float>(rand() % 100),
+	// 	           static_cast<float>(rand() % 100), 1.0f};
+	// 	obj.rot_axis =
+	// 		vkb::vec4(static_cast<float>(rand() % 100), static_cast<float>(rand() %
+	// 100), 	              static_cast<float>(rand() % 100), 1.0f) .norm3();
+	// obj.scale = {.5f, .5f, .5f, 1.f}; 	obj.rot_speed = static_cast<float>(rand()
+	// % 100) / 50.f;
+
+	// 	obj.model = &model;
+	// 	obj.tex = &tex;
+	// 	ctx.init_object(&obj);
+	// }
 
 	while (running)
 	{
@@ -169,12 +190,23 @@ int main(int argc, char** argv)
 				continue;
 			sky.prepare_draw(ctx.current_command_buffer(), ctx.current_img_idx(), cam,
 			                 ctx.get_proj());
+			mod.prepare_draw(ctx.current_command_buffer(), ctx.current_img_idx(), cam,
+			                 ctx.get_proj());
+			coords.prepare_draw(ctx.current_command_buffer(), ctx.current_img_idx(), cam,
+			                    coords_proj, translate);
 
 			ctx.begin_draw();
 			sky.draw(ctx.current_command_buffer(), ctx.current_img_idx());
 			ctx.draw();
+			mod.draw(ctx.current_command_buffer(), ctx.current_img_idx(), model, modules);
+			coords.draw(ctx.current_command_buffer(), ctx.current_img_idx());
 			ui_ctx.draw();
-			ctx.present();
+			if (ctx.present())
+			{
+				auto [w, h] = surface.get_extent();
+				coords_proj = mat4::ortho_proj(-50.f, 50.f, 0, w, h, 0);
+				translate = {(75.f * 2 / w), ((h - 75.f) * 2 / h)};
+			}
 		}
 
 		if (main_window.closed())

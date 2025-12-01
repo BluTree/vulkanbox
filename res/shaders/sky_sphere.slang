@@ -62,8 +62,9 @@ float4 f_main(vertex_out in)
 {
 	float4 col = float4(0.f, 0.f, 0.f, 1.f);
 
+	// TODO Optimize shader
 	[unroll]
-	for(int i = 0; i < star_count; ++i)
+	for(int i = 0; i < 100; ++i)
 	{
 		float ratio = clamp(sq_dist(norm(static_data[i].pos), norm(in.frag_pos)) * (20000 / static_data[i].intensity), 0.f, 1.f);
 		col += lerp(float4(1.f, 1.f, 1.f, 1.f), float4(0.f, 0.f, 0.f, 1.f), ratio);

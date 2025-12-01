@@ -99,14 +99,14 @@ namespace vkb
 	{
 		float rl = -(r + l) / (r - l);
 		float tb = -(t + b) / (t - b);
-		float nf = -2 / (far - near);
-		float nf2 = -(far + near) / (far - near);
+		float nf = 1 / (near - far);
+		float nf2 = (near) / (near - far);
 		// clang-format off
 		return {
-			2 / (r - l), 0.f,               0.f, 0.f,
-			0.f,              -2 / (t - b), 0.f, 0.f,
-			0.f,              0.f,          nf,  0.f,
-			rl,              tb,          nf2, 1.f
+			2 / (r - l), 0.f,          0.f, 0.f,
+			0.f,         -2 / (t - b), 0.f, 0.f,
+			0.f,         0.f,          nf,  0.f,
+			rl,          tb,           nf2, 1.f
 		};
 		// clang-format on
 	}

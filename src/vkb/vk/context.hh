@@ -59,7 +59,7 @@ namespace vkb::vk
 		bool prepare_draw(cam::base& cam);
 		void begin_draw();
 		void draw();
-		void present();
+		bool present();
 
 		void fill_init_info(ImGui_ImplVulkan_InitInfo& init_info);
 
